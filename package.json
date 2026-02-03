@@ -1,0 +1,43 @@
+{
+  "name": "@restingowlorg/ossec-cryptography",
+  "version": "1.0.0",
+  "description": "A minimal, framework-agnostic cryptographic library for Node.js aligned with OWASP ASVS V11",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --declaration",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "keywords": [
+    "cryptography",
+    "node-crypto",
+    "secure-crypto",
+    "encryption",
+    "hashing",
+    "framework-agnostic",
+    "backend",
+    "nodejs",
+    "typescript",
+    "owasp",
+    "asvs",
+    "security",
+    "clean-architecture"
+  ],
+  "author": "OSSec Platform",
+  "license": "MIT",
+  "type": "commonjs",
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OSSecPlatform/ossec-cryptography-library"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0"
+  }
+}
