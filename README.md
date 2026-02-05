@@ -2,7 +2,7 @@
 ```md
 # 🔐 Minimal Cryptography Library for Node.js
 
-**OWASP ASVS Aligned · Framework-Agnostic · Clean Architecture · MVP Level 1**
+**OWASP ASVS Aligned (v11) · Framework-Agnostic · Clean Architecture · MVP Level 1**
 
 A **minimal, opinionated cryptography library** for Node.js applications that provides:
 
@@ -34,14 +34,14 @@ This library provides **one correct way** to do cryptography.
 
 ## ✨ Key Features
 
-- ✅ AES-GCM authenticated encryption
+- ✅ AES-256-GCM authenticated encryption
 - ✅ Secure IV and salt generation
 - ✅ PBKDF2-based hashing
 - ✅ Timing-safe hash verification
 - ✅ Strong domain modeling (no raw Buffers leaking everywhere)
 - ✅ Framework-agnostic
 - ✅ Node.js `crypto` only (no third-party crypto deps)
-- ✅ OWASP ASVS aligned
+- ✅ OWASP ASVS aligned (v11)
 - ✅ Very small API surface
 
 ---
@@ -117,22 +117,24 @@ This guarantees:
 
 * Correct algorithm usage
 * Secure defaults
-* Centralized policy
-* Easy auditing
+* Centralized cryptographic policy
+* Easy auditing and review
 
 ---
 
 ## 🔌 Basic Usage
 
-### Creating the Library
+### Creating the Cryptography Library
 
 ```ts
 import { createCryptoLibrary } from "@restingowlorg/ossec-crypto";
 
 const crypto = createCryptoLibrary({
-  masterKey: Buffer.from(process.env.MASTER_KEY!, "hex")
+  masterKey: Buffer.from(process.env.MASTER_KEY!, "hex"),
 });
 ```
+
+> ⚠️ `MASTER_KEY` must be **32 bytes (256 bits)** and stored securely (env / vault / KMS).
 
 ---
 
@@ -156,7 +158,7 @@ plainText.toString(); // "sensitive data"
 
 ---
 
-### Hashing Data (Passwords, Secrets)
+### Hashing Data (Passwords / Secrets)
 
 ```ts
 const hash = crypto.hash(
@@ -175,7 +177,104 @@ const isValid = crypto.verifyHash(
 );
 ```
 
-Returns `true` or `false` using **timing-safe comparison**.
+Uses **timing-safe comparison** to prevent side-channel attacks.
+
+---
+
+## 🧪 Example Usage (Real Application Scenarios)
+
+### Example 1: Encrypting Sensitive Data Before Database Storage
+
+**Use case:** Encrypt PII or secrets before saving to the database.
+
+```ts
+const secretNote = "User private note";
+
+const encrypted = crypto.encrypt(Buffer.from(secretNote));
+
+await db.insert("notes", {
+  value: encrypted.value,
+  iv: encrypted.iv,
+  authTag: encrypted.authTag,
+});
+```
+
+✅ Plaintext never reaches the database
+✅ Authenticated encryption prevents tampering
+
+---
+
+### Example 2: Decrypting Data After Retrieval
+
+```ts
+const record = await db.get("notes", { id });
+
+const decrypted = crypto.decrypt({
+  value: record.value,
+  iv: record.iv,
+  authTag: record.authTag,
+});
+
+console.log(decrypted.toString());
+```
+
+If data is modified or corrupted, decryption **fails safely**.
+
+---
+
+### Example 3: Password Hashing During Signup
+
+```ts
+const password = Buffer.from("StrongPassword123!");
+
+const hash = crypto.hash(password);
+
+await db.insert("users", {
+  passwordHash: hash.value,
+  passwordSalt: hash.salt,
+});
+```
+
+✅ Unique salt per password
+✅ Resistant to rainbow table attacks
+
+---
+
+### Example 4: Password Verification During Login
+
+```ts
+const user = await db.get("users", { email });
+
+const isValid = crypto.verifyHash(
+  Buffer.from("StrongPassword123!"),
+  {
+    value: user.passwordHash,
+    salt: user.passwordSalt,
+  }
+);
+
+if (!isValid) {
+  throw new Error("Invalid credentials");
+}
+```
+
+---
+
+### Example 5: Using with Express.js (Security Boundary)
+
+```ts
+app.post("/secure-store", (req, res) => {
+  const { data } = req.body;
+
+  const encrypted = crypto.encrypt(Buffer.from(data));
+
+  res.json({
+    value: encrypted.value.toString("hex"),
+    iv: encrypted.iv.toString("hex"),
+    authTag: encrypted.authTag.toString("hex"),
+  });
+});
+```
 
 ---
 
@@ -194,8 +293,8 @@ CipherText {
 Prevents:
 
 * Losing authentication tags
-* Passing raw encrypted buffers without metadata
-* Incorrect decryption attempts
+* Passing incomplete encrypted payloads
+* Incorrect decryption usage
 
 ---
 
@@ -218,9 +317,9 @@ Prevents:
 
 ## 🔐 Secure Defaults
 
-All defaults live in one place:
+All cryptographic defaults are centralized in:
 
-```ts
+```
 config/defaults.ts
 ```
 
@@ -236,11 +335,11 @@ No hidden behavior.
 
 ---
 
-## 🔍 OWASP ASVS Alignment
+## 🔍 OWASP ASVS Alignment (v11)
 
 | Requirement Area        | Coverage              |
 | ----------------------- | --------------------- |
-| Cryptographic Storage   | ✅ Strong encryption   |
+| Cryptographic Storage   | ✅ AES-GCM encryption  |
 | Key Management          | ✅ Explicit master key |
 | Randomness              | ✅ crypto.randomBytes  |
 | Password Storage        | ✅ PBKDF2 with salt    |
@@ -256,7 +355,7 @@ No hidden behavior.
 * ❌ No JWT handling
 * ❌ No encoding / serialization opinions
 
-This is intentional.
+This is **intentional**.
 
 ---
 
