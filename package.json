@@ -10,7 +10,10 @@
   "scripts": {
     "build": "tsc --declaration",
     "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [
     "cryptography",
@@ -38,6 +41,9 @@
     "url": "https://github.com/OSSecPlatform/ossec-cryptography-library"
   },
   "devDependencies": {
-    "@types/node": "^25.2.0"
+    "@types/jest": "^30.0.0",
+    "@types/node": "^25.2.0",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.6"
   }
 }
