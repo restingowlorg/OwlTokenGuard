@@ -32,7 +32,7 @@
   ],
   "author": "OSSec Platform",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "publishConfig": {
     "access": "restricted"
   },
