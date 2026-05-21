@@ -20,6 +20,13 @@ export interface TokenConfig {
   /** Optional AES-256-GCM payload encryption before signing. */
   payloadCipher?: PayloadCipher;
   failOnCipherError?: boolean;
+  /** Invoked when rotating sessions via `previousToken`. */
+  onSessionTerminate?: (context: {
+    jti: string;
+    token: string;
+  }) => Promise<void>;
+  /** Optional `exp` claim offset in seconds from issuance. */
+  expiresInSeconds?: number;
   debug?: boolean;
   customLogger?: ILogger;
 }

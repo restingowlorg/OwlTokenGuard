@@ -1,5 +1,6 @@
 import { AlgorithmGuard } from "../src/security/AlgorithmGuard";
 import { SecurityConfigurationError } from "../src/errors/SecurityConfigurationError";
+import { generateRsaKeyPair } from "./helpers/keys";
 
 describe("AlgorithmGuard", () => {
   it("should reject the none algorithm", () => {
@@ -16,5 +17,21 @@ describe("AlgorithmGuard", () => {
     expect(() => AlgorithmGuard.assertAllowed("ES256")).not.toThrow();
     expect(() => AlgorithmGuard.assertAllowed("HS256")).not.toThrow();
     expect(() => AlgorithmGuard.assertAllowed("HS512")).not.toThrow();
+  });
+
+  it("should reject unsupported algorithms", () => {
+    expect(() => AlgorithmGuard.assertAllowed("HS384")).toThrow(
+      SecurityConfigurationError,
+    );
+  });
+
+  it("should prevent key confusion between symmetric and asymmetric algorithms", () => {
+    const { privateKey } = generateRsaKeyPair();
+    expect(() =>
+      AlgorithmGuard.validateAlgorithm("HS256", {
+        type: "asymmetric",
+        privateKey,
+      }),
+    ).toThrow(SecurityConfigurationError);
   });
 });

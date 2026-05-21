@@ -22,7 +22,11 @@ export class TokenManager {
     return this.issuer.issue(payload, options);
   }
 
+  async terminate(token: string): Promise<void> {
+    return this.issuer.terminate(token);
+  }
+
   async shutdown(): Promise<void> {
-    // TODO: release resources when stores/adapters are added
+    // no-op until external stores are wired
   }
 }
