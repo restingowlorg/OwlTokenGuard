@@ -1,11 +1,7 @@
 import { TokenManager } from "../core/TokenManager";
 import type { TokenConfig } from "../config/types";
-import { validateConfig } from "../config/validation";
 
-/** Composition root (mirrors createRateLimiter). */
-export function createTokenManager(
-  config: TokenConfig = {},
-): TokenManager {
-  validateConfig(config);
-  return new TokenManager(config);
+/** Composition root (mirrors createRateLimiter). Always use this entry point. */
+export function createTokenManager(config: TokenConfig): TokenManager {
+  return TokenManager.create(config);
 }

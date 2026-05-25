@@ -1,16 +1,27 @@
 import { randomUUID } from "crypto";
 import type { TokenConfig } from "../config/types";
 import { defaults } from "../config/defaults";
-import type { TokenPayload, GenerateOptions, TokenResult } from "./types";
+import type {
+  TokenPayload,
+  GenerateOptions,
+  TokenResult,
+  SessionHandle,
+} from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
-import {
-  decodeJwtPayload,
-  resolveSigningMaterial,
-  signJwt,
-} from "../jwt/JwtSigner";
+import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
 import { AlgorithmGuard, type SigningAlgorithm } from "../security/AlgorithmGuard";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
+
+function resolveSessionJti(session: SessionHandle): string {
+  const jti = session.jti;
+  if (typeof jti !== "string" || jti.length === 0) {
+    throw new TokenGenerationError(
+      "Session handle must include a non-empty jti from issuance or verified claims",
+    );
+  }
+  return jti;
+}
 
 /**
  * Story 1.3: hardened issuance orchestration.
@@ -32,16 +43,15 @@ export class TokenIssuer {
     payload: TokenPayload,
     options: GenerateOptions = {},
   ): Promise<TokenResult> {
-    if (options.previousToken) {
-      await this.terminate(options.previousToken);
+    if (options.previousSession) {
+      await this.terminate(options.previousSession);
     }
 
     const algorithm = this.config.algorithm ?? defaults.algorithm;
     AlgorithmGuard.assertAllowed(algorithm);
 
     const now = Math.floor(Date.now() / 1000);
-    const nbf =
-      now + (options.nbfOffsetSeconds ?? 0);
+    const nbf = now + (options.nbfOffsetSeconds ?? 0);
     const jti = randomUUID();
 
     const standardClaims = { iat: now, nbf, jti };
@@ -98,18 +108,14 @@ export class TokenIssuer {
     };
   }
 
-  async terminate(token: string): Promise<void> {
-    const decoded = decodeJwtPayload(token);
-    const jti = decoded.jti;
-
-    if (typeof jti !== "string" || jti.length === 0) {
-      throw new TokenGenerationError(
-        "Cannot terminate session: JWT is missing jti claim",
-      );
-    }
+  /**
+   * Revoke a session by server-owned jti or verified claims — not by raw JWT string.
+   */
+  async terminate(session: SessionHandle): Promise<void> {
+    const jti = resolveSessionJti(session);
 
     if (this.config.onSessionTerminate) {
-      await this.config.onSessionTerminate({ jti, token });
+      await this.config.onSessionTerminate({ jti });
       this.logger.debug(`[TokenIssuer] terminated session jti=${jti}`);
     }
   }

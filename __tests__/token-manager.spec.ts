@@ -6,6 +6,7 @@ import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
 describe("TokenManager.generate", () => {
   it("should issue an HS256 JWT with standard claims", async () => {
     const manager = createTokenManager({
+      expiresInSeconds: 3600,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
     });
@@ -25,6 +26,7 @@ describe("TokenManager.generate", () => {
   it("should issue an RS256 JWT with asymmetric keys", async () => {
     const { privateKey } = generateRsaKeyPair();
     const manager = createTokenManager({
+      expiresInSeconds: 3600,
       algorithm: "RS256",
       signingKey: { type: "asymmetric", privateKey },
     });
@@ -38,6 +40,7 @@ describe("TokenManager.generate", () => {
   it("should terminate previous session when previousToken is provided", async () => {
     const terminated: string[] = [];
     const manager = createTokenManager({
+      expiresInSeconds: 3600,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       onSessionTerminate: async ({ jti }) => {
@@ -48,7 +51,7 @@ describe("TokenManager.generate", () => {
     const first = await manager.generate({ sub: "user-3" });
     await manager.generate(
       { sub: "user-3" },
-      { previousToken: first.token },
+      { previousSession: first.claims },
     );
 
     expect(terminated).toContain(first.claims.jti);
@@ -57,6 +60,7 @@ describe("TokenManager.generate", () => {
   it("should encrypt payload with AES-256-GCM when cipher is configured", async () => {
     const encryptionKey = Buffer.alloc(32, 7);
     const manager = createTokenManager({
+      expiresInSeconds: 3600,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       payloadCipher: new Aes256GcmCipher(encryptionKey),

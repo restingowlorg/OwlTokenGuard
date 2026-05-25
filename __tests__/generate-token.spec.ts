@@ -6,7 +6,7 @@ import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
  * Integration-style tests mirroring documented usage:
  *
  *   createTokenManager({ algorithm, hmacSecret | signingKey })
- *   manager.generate(payload, { previousToken })
+ *   manager.generate(payload, { previousSession: first.claims })
  */
 describe("generate token (usage)", () => {
   describe("HS256 symmetric", () => {
@@ -16,6 +16,7 @@ describe("generate token (usage)", () => {
       const manager = createTokenManager({
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
         onSessionTerminate: async ({ jti }) => {
           terminatedJtis.push(jti);
         },
@@ -24,8 +25,6 @@ describe("generate token (usage)", () => {
       const first = await manager.generate(
         { sub: "user-123", role: "admin" },
       );
-
-      console.log(first);
 
       expect(first.token).toMatch(
         /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
@@ -42,10 +41,8 @@ describe("generate token (usage)", () => {
 
       const second = await manager.generate(
         { sub: "user-123", role: "admin" },
-        { previousToken: first.token },
+        { previousSession: first.claims },
       );
-
-      console.log(second);
 
       expect(second.token).not.toBe(first.token);
       expect(second.claims.jti).not.toBe(first.claims.jti);
@@ -60,6 +57,7 @@ describe("generate token (usage)", () => {
       const manager = createTokenManager({
         algorithm: "RS256",
         signingKey: { type: "asymmetric", privateKey },
+        expiresInSeconds: 3600,
       });
 
       const { token, referenceToken, claims } = await manager.generate({
@@ -84,6 +82,7 @@ describe("generate token (usage)", () => {
       const manager = createTokenManager({
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
       });
 
       const a = await manager.generate({ sub: "user-789" });
