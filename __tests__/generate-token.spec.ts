@@ -1,16 +1,17 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
-import { decodeJwtPayload } from "../src/jwt/JwtSigner";
+import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
 
 /**
  * Integration-style tests mirroring documented usage:
  *
  *   createTokenManager({ algorithm, hmacSecret | signingKey })
- *   manager.generate(payload, { previousSession: first.claims })
+ *   manager.generateAccessToken(payload, { previousSession: first.claims })
+ *   manager.generate(payload) // compatibility: JWT + reference
  */
 describe("generate token (usage)", () => {
   describe("HS256 symmetric", () => {
-    it("should generate a JWT, reference token, and standard claims", async () => {
+    it("should generate a JWT access token with standard claims", async () => {
       const terminatedJtis: string[] = [];
 
       const manager = createTokenManager({
@@ -22,24 +23,24 @@ describe("generate token (usage)", () => {
         },
       });
 
-      const first = await manager.generate(
+      const first = await manager.generateAccessToken(
         { sub: "user-123", role: "admin" },
       );
 
       expect(first.token).toMatch(
         /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
       );
-      expect(first.referenceToken).toBeDefined();
+      expect("referenceToken" in first).toBe(false);
       expect(first.claims.iat).toEqual(expect.any(Number));
       expect(first.claims.nbf).toEqual(expect.any(Number));
       expect(first.claims.jti).toEqual(expect.any(String));
 
-      const decodedFirst = decodeJwtPayload(first.token);
+      const decodedFirst = decodeUnsafeJwtPayload(first.token);
       expect(decodedFirst.sub).toBe("user-123");
       expect(decodedFirst.role).toBe("admin");
       expect(decodedFirst.jti).toBe(first.claims.jti);
 
-      const second = await manager.generate(
+      const second = await manager.generateAccessToken(
         { sub: "user-123", role: "admin" },
         { previousSession: first.claims },
       );
@@ -68,7 +69,7 @@ describe("generate token (usage)", () => {
       expect(token.split(".")).toHaveLength(3);
       expect(referenceToken).toBeTruthy();
 
-      const payload = decodeJwtPayload(token);
+      const payload = decodeUnsafeJwtPayload(token);
       expect(payload.sub).toBe("user-456");
       expect(payload.role).toBe("viewer");
       expect(payload.jti).toBe(claims.jti);
@@ -78,7 +79,21 @@ describe("generate token (usage)", () => {
   });
 
   describe("session rotation", () => {
-    it("should issue a new token on every generate call", async () => {
+    it("should issue a new access token on every generateAccessToken call", async () => {
+      const manager = createTokenManager({
+        algorithm: "HS256",
+        hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
+      });
+
+      const a = await manager.generateAccessToken({ sub: "user-789" });
+      const b = await manager.generateAccessToken({ sub: "user-789" });
+
+      expect(a.token).not.toBe(b.token);
+      expect(a.claims.jti).not.toBe(b.claims.jti);
+    });
+
+    it("should issue both tokens via generate compatibility wrapper", async () => {
       const manager = createTokenManager({
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
@@ -90,7 +105,6 @@ describe("generate token (usage)", () => {
 
       expect(a.token).not.toBe(b.token);
       expect(a.referenceToken).not.toBe(b.referenceToken);
-      expect(a.claims.jti).not.toBe(b.claims.jti);
     });
   });
 });

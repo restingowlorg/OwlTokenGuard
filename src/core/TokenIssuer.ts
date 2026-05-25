@@ -4,7 +4,11 @@ import { defaults } from "../config/defaults";
 import type {
   TokenPayload,
   GenerateOptions,
+  AccessTokenOptions,
+  ReferenceIssuanceOptions,
   TokenResult,
+  AccessTokenResult,
+  SessionReferenceResult,
   SessionHandle,
 } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
@@ -39,10 +43,11 @@ export class TokenIssuer {
       dependencies?.referenceGenerator ?? new ReferenceTokenGenerator();
   }
 
-  async issue(
+  /** Issue a signed JWT access token only. */
+  async issueAccessToken(
     payload: TokenPayload,
-    options: GenerateOptions = {},
-  ): Promise<TokenResult> {
+    options: AccessTokenOptions = {},
+  ): Promise<AccessTokenResult> {
     if (options.previousSession) {
       await this.terminate(options.previousSession);
     }
@@ -53,19 +58,15 @@ export class TokenIssuer {
     const now = Math.floor(Date.now() / 1000);
     const nbf = now + (options.nbfOffsetSeconds ?? 0);
     const jti = randomUUID();
-
     const standardClaims = { iat: now, nbf, jti };
-    let jwtPayload: Record<string, unknown>;
 
+    let jwtPayload: Record<string, unknown>;
     if (this.config.payloadCipher) {
       try {
         const encrypted = await this.config.payloadCipher.encrypt(
           JSON.stringify(payload),
         );
-        jwtPayload = {
-          ...standardClaims,
-          enc: encrypted,
-        };
+        jwtPayload = { ...standardClaims, enc: encrypted };
       } catch (error) {
         this.logger.error("[TokenIssuer] payload encryption failed:", error);
         if (this.config.failOnCipherError !== false) {
@@ -89,22 +90,49 @@ export class TokenIssuer {
       },
     );
 
-    const token = signJwt(jwtPayload, signingMaterial);
+    return {
+      token: signJwt(jwtPayload, signingMaterial),
+      claims: standardClaims,
+    };
+  }
 
+  /** Issue an opaque reference token only (backend-stored sessions). */
+  issueReferenceToken(
+    options: ReferenceIssuanceOptions = {},
+  ): SessionReferenceResult {
     const referenceEncoding =
       options.referenceEncoding ??
       this.config.referenceEncoding ??
       defaults.referenceEncoding;
 
-    const referenceToken = this.referenceGenerator.generate({
+    const result = this.referenceGenerator.generate({
       encoding: referenceEncoding,
       entropyBits: this.config.opaqueEntropyBits ?? defaults.opaqueEntropyBits,
-    }).token;
+    });
 
     return {
-      token,
-      referenceToken,
-      claims: standardClaims,
+      referenceToken: result.token,
+      encoding: result.encoding,
+      entropyBits: result.entropyBits,
+    };
+  }
+
+  /**
+   * Compatibility wrapper: issues both access JWT and opaque reference token.
+   * Prefer {@link issueAccessToken} or {@link issueReferenceToken} when only one is needed.
+   */
+  async issue(
+    payload: TokenPayload,
+    options: GenerateOptions = {},
+  ): Promise<TokenResult> {
+    const access = await this.issueAccessToken(payload, options);
+    const reference = this.issueReferenceToken({
+      referenceEncoding: options.referenceEncoding,
+    });
+
+    return {
+      ...access,
+      referenceToken: reference.referenceToken,
     };
   }
 
