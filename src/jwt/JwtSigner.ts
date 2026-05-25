@@ -47,7 +47,11 @@ export function signJwt(
   return `${signingInput}.${base64url(signature)}`;
 }
 
-export function decodeJwtPayload(token: string): Record<string, unknown> {
+/**
+ * Decodes a JWT payload without signature or claim verification.
+ * @internal Do not use for authorization — attacker-controlled claims are not trusted.
+ */
+export function decodeUnsafeJwtPayload(token: string): Record<string, unknown> {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new TokenGenerationError("Invalid JWT format");
