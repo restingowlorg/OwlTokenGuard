@@ -1,12 +1,22 @@
 import type { Request, Response, NextFunction } from "express";
 import type { TokenManager } from "../core/TokenManager";
-import type { VerifyOptions } from "../validation/types";
+import type { VerifyOptions, VerifyResult } from "../validation/types";
 import { TokenVerificationError } from "../errors/TokenVerificationError";
 import { UntrustedKeySourceError } from "../errors/UntrustedKeySourceError";
 
-export interface ExpressVerifyTokenOptions extends VerifyOptions {
+export interface ExpressVerifyTokenOptions extends Omit<VerifyOptions, "onVerified"> {
   /** Extract raw JWT from request (default: Authorization Bearer). */
   extractToken?: (req: Request) => string | undefined;
+  /**
+   * Hook after verification succeeds. Receives Express `next` for chain control.
+   * If omitted, middleware calls `next()` automatically.
+   */
+  onVerified?: (
+    result: VerifyResult,
+    next: NextFunction,
+    req: Request,
+    res: Response,
+  ) => Promise<void> | void;
 }
 
 function defaultExtractBearerToken(req: Request): string | undefined {
@@ -18,13 +28,15 @@ function defaultExtractBearerToken(req: Request): string | undefined {
 
 /**
  * Express middleware — runs default verification on every protected request.
- * Attach custom logic via VerifyOptions.onVerified or route handlers using req.auth.
+ * Attach custom logic via `options.onVerified` or route handlers using `req.auth`.
  */
 export function expressVerifyToken(
   tokenManager: TokenManager,
   options: ExpressVerifyTokenOptions = {},
 ) {
-  const extractToken = options.extractToken ?? defaultExtractBearerToken;
+  const { onVerified, extractToken: extractTokenOption, ...verifyOptions } =
+    options;
+  const extractToken = extractTokenOption ?? defaultExtractBearerToken;
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -36,8 +48,24 @@ export function expressVerifyToken(
         });
       }
 
-      const auth = await tokenManager.verify(token, options);
+      const auth = await tokenManager.verify(token, verifyOptions);
       (req as Request & { auth?: typeof auth }).auth = auth;
+
+      if (onVerified) {
+        let advanced = false;
+        const advance: NextFunction = (...args) => {
+          if (advanced) return;
+          advanced = true;
+          next(...args);
+        };
+
+        await onVerified(auth, advance, req, res);
+        if (!advanced) {
+          advance();
+        }
+        return;
+      }
+
       next();
     } catch (error) {
       if (

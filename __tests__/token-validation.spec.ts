@@ -27,11 +27,10 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     const result = await validateToken(manager, issued.token, {
-      purpose: "access",
-      onVerified: (result) =>{
-        console.log("result", result);
-      },
+      purpose: "access"
     });
+
+    console.log("result", result);
 
     expect(result.jti).toBe(issued.claims.jti);
     expect(result.payload.sub).toBe("user-1");

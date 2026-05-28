@@ -124,9 +124,27 @@ describe("expressVerifyToken middleware", () => {
     const hookApp = createTestApp(
       "/hook",
       expressVerifyToken(manager, {
-        onVerified: (result) => {
-          seen.push(result.jti);
-        },
+        purpose: "access",
+        onVerified: async (result, next, req, res) => {
+          console.log("result", result);
+          try {
+            seen.push(result.jti);
+            if (result.payload.token_use === "id") {
+              await res.status(401).json({
+                error: "Unauthorized",
+                message: "ID token cannot be used as access token",
+              });
+            } else {
+              await res.status(401).json({
+                error: "Unauthorized",
+                message: "ID token cannot be used as access token",
+              });
+            }
+            await next();
+          } catch (error) {
+            next(error);
+          }
+        }
       }),
     );
     const issued = await manager.generateAccessToken({ sub: "hook-user" });
@@ -134,9 +152,28 @@ describe("expressVerifyToken middleware", () => {
     await request(hookApp)
       .get("/hook/profile")
       .set("Authorization", `Bearer ${issued.token}`)
-      .expect(200);
+      .expect(401);
 
     expect(seen).toEqual([issued.claims.jti]);
+  });
+
+  it("should auto-advance when onVerified does not call next", async () => {
+    const hookApp = createTestApp(
+      "/auto-next",
+      expressVerifyToken(manager, {
+        onVerified: (result) => {
+          expect(result.payload.sub).toBe("auto-next-user");
+        },
+      }),
+    );
+    const issued = await manager.generateAccessToken({ sub: "auto-next-user" });
+
+    const response = await request(hookApp)
+      .get("/auto-next/profile")
+      .set("Authorization", `Bearer ${issued.token}`)
+      .expect(200);
+
+    expect(response.body.sub).toBe("auto-next-user");
   });
 
   it("should support custom token extraction", async () => {
