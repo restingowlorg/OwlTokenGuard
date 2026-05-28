@@ -2,12 +2,13 @@ import type { SigningAlgorithm } from "../security/AlgorithmGuard";
 import type { ReferenceTokenEncoding } from "../generators/types";
 import type { PayloadCipher } from "../ciphering/PayloadCipher";
 import type { ILogger } from "../utils/Logger";
+import type { VerificationPolicy } from "../validation/types";
 
 export type SigningKeyMaterial =
   | { type: "symmetric"; secret: string }
   | { type: "asymmetric"; privateKey: string; publicKey?: string };
 
-export interface TokenConfig {
+export interface TokenConfig extends VerificationPolicy {
   /** Preferred: RS256 or ES256. HS256/HS512 require high-entropy secrets. */
   algorithm?: SigningAlgorithm;
   signingKey?: SigningKeyMaterial;
