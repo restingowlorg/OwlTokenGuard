@@ -157,6 +157,25 @@ describe("expressVerifyToken middleware", () => {
     expect(seen).toEqual([issued.claims.jti]);
   });
 
+  it("should not auto-advance when onVerified sends a response", async () => {
+    const hookApp = createTestApp(
+      "/deny",
+      expressVerifyToken(manager, {
+        onVerified: (_result, _next, _req, res) => {
+          res.status(403).json({ error: "Forbidden" });
+        },
+      }),
+    );
+    const issued = await manager.generateAccessToken({ sub: "denied-user" });
+
+    const response = await request(hookApp)
+      .get("/deny/profile")
+      .set("Authorization", `Bearer ${issued.token}`)
+      .expect(403);
+
+    expect(response.body.error).toBe("Forbidden");
+  });
+
   it("should auto-advance when onVerified does not call next", async () => {
     const hookApp = createTestApp(
       "/auto-next",

@@ -8,6 +8,16 @@ function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
+function normalizeDeclaredTokenType(value: string): TokenPurpose | undefined {
+  if (value === "access" || value === "at+jwt") {
+    return "access";
+  }
+  if (value === "id" || value === "id+jwt") {
+    return "id";
+  }
+  return undefined;
+}
+
 /**
  * Epic 2: fail-shut verification gatekeeper (ASVS 9.1 & 9.2).
  */
@@ -15,12 +25,15 @@ export class TokenVerifier {
   constructor(private readonly config: TokenConfig) {}
 
   async verify(token: string, options: VerifyOptions = {}): Promise<VerifyResult> {
-    const { payload: rawPayload } = verifyJwtSignatureFirst(token, this.config);
+    const { header, payload: rawPayload } = verifyJwtSignatureFirst(
+      token,
+      this.config,
+    );
     const payload = await this.resolvePayload(rawPayload);
     this.assertTemporalClaims(payload, options);
     this.assertIssuer(payload, options);
     this.assertAudience(payload, options);
-    this.assertPurpose(payload, options.purpose);
+    this.assertPurpose(header, payload, options.purpose);
 
     const jti = payload.jti;
     if (typeof jti !== "string" || jti.length === 0) {
@@ -71,6 +84,10 @@ export class TokenVerifier {
     payload: Record<string, unknown>,
     options: VerifyOptions,
   ): void {
+    const requireTemporal =
+      options.requireTemporalClaims ??
+      this.config.requireTemporalClaims ??
+      options.purpose === "access";
     const tolerance =
       options.clockToleranceSeconds ??
       this.config.clockToleranceSeconds ??
@@ -78,11 +95,21 @@ export class TokenVerifier {
     const now = nowSeconds();
 
     const nbf = payload.nbf;
+    const exp = payload.exp;
+
+    if (requireTemporal) {
+      if (typeof exp !== "number") {
+        throw new TokenVerificationError("JWT is missing required exp claim");
+      }
+      if (typeof nbf !== "number") {
+        throw new TokenVerificationError("JWT is missing required nbf claim");
+      }
+    }
+
     if (typeof nbf === "number" && now + tolerance < nbf) {
       throw new TokenVerificationError("Token is not yet valid (nbf)");
     }
 
-    const exp = payload.exp;
     if (typeof exp === "number" && now - tolerance >= exp) {
       throw new TokenVerificationError("Token has expired (exp)");
     }
@@ -134,33 +161,47 @@ export class TokenVerifier {
 
   /** Story 2.4: prevent ID tokens from being used as access tokens. */
   private assertPurpose(
+    header: Record<string, unknown>,
     payload: Record<string, unknown>,
     purpose?: TokenPurpose,
   ): void {
     if (!purpose) return;
 
-    const tokenUse =
-      typeof payload.token_use === "string"
-        ? payload.token_use.toLowerCase()
-        : undefined;
-    const typ =
-      typeof payload.typ === "string" ? payload.typ.toLowerCase() : undefined;
+    const declaredType = this.resolveDeclaredTokenType(header, payload);
 
     if (purpose === "access") {
-      if (tokenUse === "id" || typ === "id") {
+      if (!declaredType) {
+        throw new TokenVerificationError(
+          "Token is missing required type (header.typ or token_use)",
+        );
+      }
+      if (declaredType === "id") {
         throw new TokenVerificationError(
           "ID token cannot be used as an access token",
         );
       }
     }
 
-    if (purpose === "id") {
-      if (tokenUse === "access") {
-        throw new TokenVerificationError(
-          "Access token cannot be used as an ID token",
-        );
-      }
+    if (purpose === "id" && declaredType === "access") {
+      throw new TokenVerificationError(
+        "Access token cannot be used as an ID token",
+      );
     }
+  }
+
+  private resolveDeclaredTokenType(
+    header: Record<string, unknown>,
+    payload: Record<string, unknown>,
+  ): TokenPurpose | undefined {
+    const candidates = [payload.token_use, header.typ, payload.typ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate !== "string") continue;
+      const normalized = normalizeDeclaredTokenType(candidate.toLowerCase());
+      if (normalized) return normalized;
+    }
+
+    return undefined;
   }
 
   private extractStandardClaims(

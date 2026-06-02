@@ -66,16 +66,16 @@ export class TokenIssuer {
         const encrypted = await this.config.payloadCipher.encrypt(
           JSON.stringify(payload),
         );
-        jwtPayload = { ...standardClaims, enc: encrypted };
+        jwtPayload = { ...standardClaims, enc: encrypted, token_use: "access" };
       } catch (error) {
         this.logger.error("[TokenIssuer] payload encryption failed:", error);
         if (this.config.failOnCipherError !== false) {
           throw new TokenGenerationError("Payload encryption failed");
         }
-        jwtPayload = { ...payload, ...standardClaims };
+        jwtPayload = { ...payload, ...standardClaims, token_use: "access" };
       }
     } else {
-      jwtPayload = { ...payload, ...standardClaims };
+      jwtPayload = { ...payload, ...standardClaims, token_use: "access" };
     }
 
     if (this.config.expiresInSeconds !== undefined) {

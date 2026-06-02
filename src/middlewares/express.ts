@@ -54,13 +54,13 @@ export function expressVerifyToken(
       if (onVerified) {
         let advanced = false;
         const advance: NextFunction = (...args) => {
-          if (advanced) return;
+          if (advanced || res.headersSent) return;
           advanced = true;
           next(...args);
         };
 
         await onVerified(auth, advance, req, res);
-        if (!advanced) {
+        if (!advanced && !res.headersSent) {
           advance();
         }
         return;

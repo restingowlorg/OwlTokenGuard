@@ -71,6 +71,30 @@ describe("Epic 2: validateToken / verify", () => {
     );
   });
 
+  it("should reject verification when no allowlist is configured (Story 2.1)", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      allowedAlgorithms: [],
+    });
+    const issued = await manager.generateAccessToken({ sub: "user-1" });
+
+    await expect(validateToken(manager, issued.token)).rejects.toThrow(
+      /Verification allowlist is required/i,
+    );
+  });
+
+  it("should fall back to configured algorithm when allowedAlgorithms is omitted", async () => {
+    const manager = createTokenManager(baseConfig);
+    const issued = await manager.generateAccessToken({
+      sub: "user-1",
+      iss: "https://issuer.example",
+      aud: "my-api",
+    });
+
+    const result = await validateToken(manager, issued.token);
+    expect(result.payload.sub).toBe("user-1");
+  });
+
   it("should reject untrusted jku header (Story 2.2)", async () => {
     const manager = createTokenManager({
       ...baseConfig,
@@ -85,6 +109,26 @@ describe("Epic 2: validateToken / verify", () => {
     await expect(validateToken(manager, token)).rejects.toThrow(
       UntrustedKeySourceError,
     );
+  });
+
+  it("should reject non-https jku and x5u headers (Story 2.2)", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedKeySourceDomains: ["keys.example"],
+    });
+    const httpJku = buildSignedTestJwt(
+      baseConfig,
+      { sub: "user-1" },
+      { jku: "http://keys.example/keys.json" },
+    );
+    const httpX5u = buildSignedTestJwt(
+      baseConfig,
+      { sub: "user-1" },
+      { x5u: "http://keys.example/cert.pem" },
+    );
+
+    await expect(validateToken(manager, httpJku)).rejects.toThrow(/must use https/i);
+    await expect(validateToken(manager, httpX5u)).rejects.toThrow(/must use https/i);
   });
 
   it("should reject expired tokens (Story 2.3 exp)", async () => {
@@ -107,6 +151,40 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     await expect(validateToken(manager, token)).rejects.toThrow(/not yet valid/i);
+  });
+
+  it("should require exp and nbf for access token verification (Story 2.3)", async () => {
+    const manager = createTokenManager(baseConfig);
+    const withoutExp = buildSignedTestJwt(baseConfig, {
+      sub: "user-1",
+      exp: undefined,
+    });
+    const withoutNbf = buildSignedTestJwt(baseConfig, {
+      sub: "user-1",
+      nbf: undefined,
+    });
+
+    await expect(
+      validateToken(manager, withoutExp, { purpose: "access" }),
+    ).rejects.toThrow(/missing required exp claim/i);
+    await expect(
+      validateToken(manager, withoutNbf, { purpose: "access" }),
+    ).rejects.toThrow(/missing required nbf claim/i);
+  });
+
+  it("should allow missing exp when temporal claims are not required", async () => {
+    const manager = createTokenManager(baseConfig);
+    const token = buildSignedTestJwt(baseConfig, {
+      sub: "user-1",
+      iss: "https://issuer.example",
+      aud: "my-api",
+      exp: undefined,
+    });
+
+    const result = await validateToken(manager, token, {
+      requireTemporalClaims: false,
+    });
+    expect(result.payload.sub).toBe("user-1");
   });
 
   it("should reject audience mismatch (Story 2.3 aud)", async () => {
@@ -141,13 +219,60 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     await expect(
-      validateToken(manager, token, { purpose: "access" , onVerified: (result) =>{
-        console.log("result", result);
-        if (result.payload.token_use === "id") {
-          throw new TokenVerificationError("ID token cannot be used as access token");
-        }
-      }},
-      ),
+      validateToken(manager, token, { purpose: "access" }),
+    ).rejects.toThrow(/ID token cannot be used/i);
+  });
+
+  it("should reject access verification when token type is missing (Story 2.4)", async () => {
+    const manager = createTokenManager(baseConfig);
+    const token = buildSignedTestJwt(
+      baseConfig,
+      {
+        sub: "user-1",
+        iss: "https://issuer.example",
+        aud: "my-api",
+        token_use: undefined,
+      },
+      { typ: "JWT" },
+    );
+
+    await expect(
+      validateToken(manager, token, { purpose: "access" }),
+    ).rejects.toThrow(/missing required type/i);
+  });
+
+  it("should accept access verification when type is declared in header.typ", async () => {
+    const manager = createTokenManager(baseConfig);
+    const token = buildSignedTestJwt(
+      baseConfig,
+      {
+        sub: "user-1",
+        iss: "https://issuer.example",
+        aud: "my-api",
+        token_use: undefined,
+      },
+      { typ: "access" },
+    );
+
+    const result = await validateToken(manager, token, { purpose: "access" });
+    expect(result.payload.sub).toBe("user-1");
+  });
+
+  it("should reject access verification when header.typ declares id", async () => {
+    const manager = createTokenManager(baseConfig);
+    const token = buildSignedTestJwt(
+      baseConfig,
+      {
+        sub: "user-1",
+        iss: "https://issuer.example",
+        aud: "my-api",
+        token_use: undefined,
+      },
+      { typ: "id" },
+    );
+
+    await expect(
+      validateToken(manager, token, { purpose: "access" }),
     ).rejects.toThrow(/ID token cannot be used/i);
   });
 

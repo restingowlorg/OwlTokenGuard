@@ -58,6 +58,7 @@ export function buildSignedTestJwt(
     nbf: now,
     jti: "test-jti",
     exp: now + config.expiresInSeconds,
+    token_use: "access",
     ...payload,
   };
   const material = resolveSigningMaterial(algorithm, {

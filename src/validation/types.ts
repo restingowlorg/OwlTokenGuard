@@ -14,6 +14,8 @@ export interface VerificationPolicy {
   trustedKeySourceDomains?: string[];
   /** Clock skew tolerance in seconds for exp/nbf checks. */
   clockToleranceSeconds?: number;
+  /** Require exp and nbf claims during verification. */
+  requireTemporalClaims?: boolean;
   /** Optional revocation check after cryptographic validation. */
   isSessionRevoked?: (jti: string) => Promise<boolean>;
 }
@@ -26,6 +28,8 @@ export interface VerifyOptions {
   /** Override configured trusted issuers for this verification. */
   trustedIssuers?: string[];
   clockToleranceSeconds?: number;
+  /** Override configured temporal-claim requirement for this verification. */
+  requireTemporalClaims?: boolean;
   /** Developer hook after default validation succeeds. */
   onVerified?: (result: VerifyResult) => Promise<void> | void;
 }

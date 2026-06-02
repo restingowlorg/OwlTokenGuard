@@ -88,8 +88,12 @@ function assertAlgorithmPermitted(
   algorithm: SigningAlgorithm,
   config: TokenConfig,
 ): void {
-  const allowed = config.allowedAlgorithms;
-  if (!allowed || allowed.length === 0) return;
+  const allowed =
+    config.allowedAlgorithms ??
+    (config.algorithm ? [config.algorithm] : undefined);
+  if (!allowed || allowed.length === 0) {
+    throw new TokenVerificationError("Verification allowlist is required");
+  }
   if (!allowed.includes(algorithm)) {
     throw new TokenVerificationError(
       `Algorithm "${algorithm}" is not in the verification allowlist`,

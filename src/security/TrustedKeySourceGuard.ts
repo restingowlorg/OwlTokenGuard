@@ -33,12 +33,18 @@ export class TrustedKeySourceGuard {
     trustedDomains: string[],
     headerName: string,
   ): void {
-    let hostname: string;
+    let parsed: URL;
     try {
-      hostname = new URL(urlValue).hostname.toLowerCase();
+      parsed = new URL(urlValue);
     } catch {
       throw new UntrustedKeySourceError(`Malformed ${headerName} URL`);
     }
+
+    if (parsed.protocol !== "https:") {
+      throw new UntrustedKeySourceError(`${headerName} must use https`);
+    }
+
+    const hostname = parsed.hostname.toLowerCase();
 
     const allowed = trustedDomains.some((domain) => {
       const normalized = domain.toLowerCase();
