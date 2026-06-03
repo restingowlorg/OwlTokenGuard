@@ -30,8 +30,6 @@ describe("Epic 2: validateToken / verify", () => {
       purpose: "access"
     });
 
-    console.log("result", result);
-
     expect(result.jti).toBe(issued.claims.jti);
     expect(result.payload.sub).toBe("user-1");
     expect(result.claims.aud).toBe("my-api");
@@ -238,7 +236,7 @@ describe("Epic 2: validateToken / verify", () => {
 
     await expect(
       validateToken(manager, token, { purpose: "access" }),
-    ).rejects.toThrow(/missing required type/i);
+    ).rejects.toThrow(/Token type is required when purpose is enforced/i);
   });
 
   it("should accept access verification when type is declared in header.typ", async () => {

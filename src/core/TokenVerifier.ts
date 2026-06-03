@@ -33,7 +33,7 @@ export class TokenVerifier {
     this.assertTemporalClaims(payload, options);
     this.assertIssuer(payload, options);
     this.assertAudience(payload, options);
-    this.assertPurpose(header, payload, options.purpose);
+    this.assertPurpose(payload, header, options.purpose);
 
     const jti = payload.jti;
     if (typeof jti !== "string" || jti.length === 0) {
@@ -161,47 +161,43 @@ export class TokenVerifier {
 
   /** Story 2.4: prevent ID tokens from being used as access tokens. */
   private assertPurpose(
-    header: Record<string, unknown>,
     payload: Record<string, unknown>,
+    header: Record<string, unknown>,
     purpose?: TokenPurpose,
   ): void {
     if (!purpose) return;
 
-    const declaredType = this.resolveDeclaredTokenType(header, payload);
+    const tokenUse =
+      typeof payload.token_use === "string"
+        ? payload.token_use.toLowerCase()
+        : undefined;
+    const payloadTyp =
+      typeof payload.typ === "string" ? payload.typ.toLowerCase() : undefined;
+    const headerTyp =
+      typeof header.typ === "string" ? header.typ.toLowerCase() : undefined;
 
-    if (purpose === "access") {
-      if (!declaredType) {
-        throw new TokenVerificationError(
-          "Token is missing required type (header.typ or token_use)",
-        );
-      }
-      if (declaredType === "id") {
-        throw new TokenVerificationError(
-          "ID token cannot be used as an access token",
-        );
-      }
+    const rawEffective = tokenUse ?? payloadTyp ?? headerTyp;
+    const effective = rawEffective
+      ? normalizeDeclaredTokenType(rawEffective)
+      : undefined;
+
+    if (!effective) {
+      throw new TokenVerificationError(
+        "Token type is required when purpose is enforced",
+      );
     }
 
-    if (purpose === "id" && declaredType === "access") {
+    if (purpose === "access" && effective === "id") {
+      throw new TokenVerificationError(
+        "ID token cannot be used as an access token",
+      );
+    }
+
+    if (purpose === "id" && effective === "access") {
       throw new TokenVerificationError(
         "Access token cannot be used as an ID token",
       );
     }
-  }
-
-  private resolveDeclaredTokenType(
-    header: Record<string, unknown>,
-    payload: Record<string, unknown>,
-  ): TokenPurpose | undefined {
-    const candidates = [payload.token_use, header.typ, payload.typ];
-
-    for (const candidate of candidates) {
-      if (typeof candidate !== "string") continue;
-      const normalized = normalizeDeclaredTokenType(candidate.toLowerCase());
-      if (normalized) return normalized;
-    }
-
-    return undefined;
   }
 
   private extractStandardClaims(

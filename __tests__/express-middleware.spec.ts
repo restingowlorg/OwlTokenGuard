@@ -119,80 +119,98 @@ describe("expressVerifyToken middleware", () => {
     expect(response.body.sub).toBe("alias-user");
   });
 
-  it("should run onVerified hook before reaching the route handler", async () => {
-    const seen: string[] = [];
-    const hookApp = createTestApp(
-      "/hook",
-      expressVerifyToken(manager, {
-        purpose: "access",
-        onVerified: async (result, next, req, res) => {
-          console.log("result", result);
-          try {
+  describe("onVerified control flow", () => {
+    it("should run onVerified before the route and continue when next is called", async () => {
+      const seen: string[] = [];
+      const hookApp = createTestApp(
+        "/hook-pass",
+        expressVerifyToken(manager, {
+          purpose: "access",
+          onVerified: (result, next) => {
             seen.push(result.jti);
-            if (result.payload.token_use === "id") {
-              await res.status(401).json({
-                error: "Unauthorized",
-                message: "ID token cannot be used as access token",
-              });
-            } else {
-              await res.status(401).json({
-                error: "Unauthorized",
-                message: "ID token cannot be used as access token",
-              });
-            }
-            await next();
-          } catch (error) {
-            next(error);
-          }
-        }
-      }),
-    );
-    const issued = await manager.generateAccessToken({ sub: "hook-user" });
+            next();
+          },
+        }),
+      );
+      const issued = await manager.generateAccessToken({ sub: "hook-pass-user" });
 
-    await request(hookApp)
-      .get("/hook/profile")
-      .set("Authorization", `Bearer ${issued.token}`)
-      .expect(401);
+      const response = await request(hookApp)
+        .get("/hook-pass/profile")
+        .set("Authorization", `Bearer ${issued.token}`)
+        .expect(200);
 
-    expect(seen).toEqual([issued.claims.jti]);
-  });
+      expect(seen).toEqual([issued.claims.jti]);
+      expect(response.body).toEqual({
+        sub: "hook-pass-user",
+        jti: issued.claims.jti,
+      });
+    });
 
-  it("should not auto-advance when onVerified sends a response", async () => {
-    const hookApp = createTestApp(
-      "/deny",
-      expressVerifyToken(manager, {
-        onVerified: (_result, _next, _req, res) => {
-          res.status(403).json({ error: "Forbidden" });
-        },
-      }),
-    );
-    const issued = await manager.generateAccessToken({ sub: "denied-user" });
+    it("should auto-advance when onVerified returns without calling next", async () => {
+      const hookApp = createTestApp(
+        "/hook-auto-next",
+        expressVerifyToken(manager, {
+          purpose: "access",
+          onVerified: (result) => {
+            expect(result.payload.sub).toBe("auto-next-user");
+          },
+        }),
+      );
+      const issued = await manager.generateAccessToken({ sub: "auto-next-user" });
 
-    const response = await request(hookApp)
-      .get("/deny/profile")
-      .set("Authorization", `Bearer ${issued.token}`)
-      .expect(403);
+      const response = await request(hookApp)
+        .get("/hook-auto-next/profile")
+        .set("Authorization", `Bearer ${issued.token}`)
+        .expect(200);
 
-    expect(response.body.error).toBe("Forbidden");
-  });
+      expect(response.body.sub).toBe("auto-next-user");
+    });
 
-  it("should auto-advance when onVerified does not call next", async () => {
-    const hookApp = createTestApp(
-      "/auto-next",
-      expressVerifyToken(manager, {
-        onVerified: (result) => {
-          expect(result.payload.sub).toBe("auto-next-user");
-        },
-      }),
-    );
-    const issued = await manager.generateAccessToken({ sub: "auto-next-user" });
+    it("should stop the chain when onVerified sends a response without calling next", async () => {
+      const seen: string[] = [];
+      const hookApp = createTestApp(
+        "/hook-fail",
+        expressVerifyToken(manager, {
+          purpose: "access",
+          onVerified: (result, _next, _req, res) => {
+            seen.push(result.jti);
+            res.status(401).json({
+              error: "Unauthorized",
+              message: "Blocked by onVerified",
+            });
+          },
+        }),
+      );
+      const issued = await manager.generateAccessToken({ sub: "hook-fail-user" });
 
-    const response = await request(hookApp)
-      .get("/auto-next/profile")
-      .set("Authorization", `Bearer ${issued.token}`)
-      .expect(200);
+      const response = await request(hookApp)
+        .get("/hook-fail/profile")
+        .set("Authorization", `Bearer ${issued.token}`)
+        .expect(401);
 
-    expect(response.body.sub).toBe("auto-next-user");
+      expect(seen).toEqual([issued.claims.jti]);
+      expect(response.body.message).toBe("Blocked by onVerified");
+    });
+
+    it("should not auto-advance when onVerified sends a forbidden response", async () => {
+      const hookApp = createTestApp(
+        "/hook-forbidden",
+        expressVerifyToken(manager, {
+          purpose: "access",
+          onVerified: (_result, _next, _req, res) => {
+            res.status(403).json({ error: "Forbidden" });
+          },
+        }),
+      );
+      const issued = await manager.generateAccessToken({ sub: "denied-user" });
+
+      const response = await request(hookApp)
+        .get("/hook-forbidden/profile")
+        .set("Authorization", `Bearer ${issued.token}`)
+        .expect(403);
+
+      expect(response.body.error).toBe("Forbidden");
+    });
   });
 
   it("should support custom token extraction", async () => {
