@@ -10,6 +10,7 @@ import type {
   AccessTokenResult,
   SessionReferenceResult,
   SessionHandle,
+  StandardClaims,
 } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
 import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
@@ -90,9 +91,64 @@ export class TokenIssuer {
       },
     );
 
-    return {
+    const result: AccessTokenResult = {
       token: signJwt(jwtPayload, signingMaterial),
       claims: standardClaims,
+    };
+
+    if (this.config.refreshTokenEnabled) {
+      const refresh = this.issueRefreshToken(payload, signingMaterial);
+      result.refreshToken = refresh.refreshToken;
+      result.refreshClaims = refresh.refreshClaims;
+
+      const onRefreshTokenIssued =
+        options.onRefreshTokenIssued ?? this.config.onRefreshTokenIssued;
+      if (onRefreshTokenIssued) {
+        await onRefreshTokenIssued({
+          refreshToken: refresh.refreshToken,
+          refreshClaims: refresh.refreshClaims,
+          accessClaims: standardClaims,
+          payload,
+          expiresAt: refresh.expiresAt,
+        });
+      }
+    }
+
+    return result;
+  }
+
+  private issueRefreshToken(
+    payload: TokenPayload,
+    signingMaterial: ReturnType<typeof resolveSigningMaterial>,
+  ): {
+    refreshToken: string;
+    refreshClaims: StandardClaims;
+    expiresAt: number;
+  } {
+    const expiresIn = this.config.refreshTokenExpiresInSeconds;
+    if (expiresIn === undefined) {
+      throw new TokenGenerationError(
+        "refreshTokenExpiresInSeconds is required when refresh tokens are enabled",
+      );
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const jti = randomUUID();
+    const refreshClaims: StandardClaims = { iat: now, nbf: now, jti };
+    const jwtPayload: Record<string, unknown> = {
+      ...refreshClaims,
+      token_use: "refresh",
+      exp: now + expiresIn,
+    };
+
+    if (typeof payload.sub === "string") {
+      jwtPayload.sub = payload.sub;
+    }
+
+    return {
+      refreshToken: signJwt(jwtPayload, signingMaterial),
+      refreshClaims,
+      expiresAt: now + expiresIn,
     };
   }
 

@@ -15,11 +15,25 @@ export type SessionHandle = StandardClaims | { jti: string };
 
 export type TokenPayload = Record<string, unknown>;
 
+/** Context passed to `onRefreshTokenIssued` for server-side persistence. */
+export interface RefreshTokenIssuedContext {
+  refreshToken: string;
+  refreshClaims: StandardClaims;
+  accessClaims: StandardClaims;
+  payload: TokenPayload;
+  /** Refresh token expiry as Unix seconds. */
+  expiresAt: number;
+}
+
 export interface AccessTokenOptions {
   /** Terminate a prior session when rotating access tokens. */
   previousSession?: SessionHandle;
   /** Not-before offset in seconds from now. */
   nbfOffsetSeconds?: number;
+  /** Override configured refresh-token persistence hook for this issuance. */
+  onRefreshTokenIssued?: (
+    context: RefreshTokenIssuedContext,
+  ) => Promise<void> | void;
 }
 
 export interface ReferenceIssuanceOptions {
@@ -36,6 +50,9 @@ export interface GenerateOptions
 export interface AccessTokenResult {
   token: string;
   claims: StandardClaims;
+  /** Present when `refreshTokenEnabled` is true in config. */
+  refreshToken?: string;
+  refreshClaims?: StandardClaims;
 }
 
 /** Opaque backend session identifier (ASVS 7.2.3). */

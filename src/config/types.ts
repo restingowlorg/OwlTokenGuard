@@ -3,6 +3,7 @@ import type { ReferenceTokenEncoding } from "../generators/types";
 import type { PayloadCipher } from "../ciphering/PayloadCipher";
 import type { ILogger } from "../utils/Logger";
 import type { VerificationPolicy } from "../validation/types";
+import type { RefreshTokenIssuedContext } from "../core/types";
 
 export type SigningKeyMaterial =
   | { type: "symmetric"; secret: string }
@@ -23,8 +24,19 @@ export interface TokenConfig extends VerificationPolicy {
   failOnCipherError?: boolean;
   /** Invoked when rotating sessions via `previousSession`. */
   onSessionTerminate?: (context: { jti: string }) => Promise<void>;
+  /**
+   * Invoked after a refresh token is generated — persist it server-side (e.g. database).
+   * Only runs when `refreshTokenEnabled` is true.
+   */
+  onRefreshTokenIssued?: (
+    context: RefreshTokenIssuedContext,
+  ) => Promise<void> | void;
   /** Required `exp` claim offset in seconds from issuance. */
   expiresInSeconds: number;
+  /** Issue a refresh JWT alongside each access token. */
+  refreshTokenEnabled?: boolean;
+  /** Refresh token `exp` offset in seconds from issuance. */
+  refreshTokenExpiresInSeconds?: number;
   debug?: boolean;
   customLogger?: ILogger;
 }

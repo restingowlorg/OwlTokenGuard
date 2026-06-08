@@ -17,6 +17,15 @@ export function validateConfig(config: TokenConfig): void {
   if (config.signingKey !== undefined) {
     validateAlgorithm(algorithm, config.signingKey);
   }
+
+  if (
+    config.refreshTokenEnabled &&
+    config.refreshTokenExpiresInSeconds === undefined
+  ) {
+    throw new SecurityConfigurationError(
+      "refreshTokenExpiresInSeconds is required when refreshTokenEnabled is true",
+    );
+  }
 }
 
 /** Story 1.1: enforce minimum 64-char HMAC secrets (HS256/HS512). */

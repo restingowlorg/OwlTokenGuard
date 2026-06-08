@@ -8,6 +8,7 @@ export {
   validateTokenMiddleware,
 } from "./middlewares/express";
 
+
 // Types
 export * from "./core/types";
 export * from "./config/types";
