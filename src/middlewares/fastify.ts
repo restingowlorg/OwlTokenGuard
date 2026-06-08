@@ -54,16 +54,12 @@ export function fastifyVerifyToken(
       request.auth = auth;
 
       if (onVerified) {
-        let continued = false;
-        const continueHook = () => {
-          if (continued || reply.sent) return;
-          continued = true;
-        };
-
-        await onVerified(auth, continueHook, request, reply);
-        if (reply.sent) return;
-        return;
+        await onVerified(auth, () => { return void 0; }, request, reply);
+        if (reply.sent) {
+          return;
+        }
       }
+
     } catch (error) {
       if (
         error instanceof TokenVerificationError ||

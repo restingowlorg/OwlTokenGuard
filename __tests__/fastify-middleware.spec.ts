@@ -41,7 +41,13 @@ describe("fastifyVerifyToken middleware", () => {
 
   beforeEach(async () => {
     app = await createTestApp(
-      fastifyVerifyToken(manager, { purpose: "access" }),
+      fastifyVerifyToken(manager, {
+        purpose: "access",
+        // continueHook is not needed for Fastify to work
+        onVerified: async (_result, _request, _reply) => {
+          // if needed, add additional validation here
+        }
+      }),
     );
   });
 
@@ -121,5 +127,80 @@ describe("fastifyVerifyToken middleware", () => {
 
     expect(response.body.sub).toBe("alias-user");
     await aliasApp.close();
+  });
+
+  // --- new custom options tests ---
+
+  it("should support a custom extractToken function", async () => {
+    const customExtractApp = await createTestApp(
+      fastifyVerifyToken(manager, {
+        extractToken: (request) => {
+          return request.headers["x-custom-token"] as string;
+        },
+      })
+    );
+
+    const issued = await manager.generateAccessToken({ sub: "custom-token-user" });
+
+    // we can verify the token with Bearer token
+    await supertest(customExtractApp.server)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.token}`)
+      .expect(401);
+
+    // we can verify the token with x-custom-token header
+    const response = await supertest(customExtractApp.server)
+      .get("/api/profile")
+      .set("x-custom-token", issued.token)
+      .expect(200);
+
+    expect(response.body.sub).toBe("custom-token-user");
+    await customExtractApp.close();
+  });
+
+  it("should allow onVerified to intercept and send an early response", async () => {
+    const interceptApp = await createTestApp(
+      fastifyVerifyToken(manager, {
+        // Fastify style: onVerified should be async function
+        onVerified: async (auth, _continueHook, _request, reply) => {
+          if (auth.payload.sub === "banned-user") {
+            return reply.status(403).send({ error: "Forbidden", message: "User is banned" });
+          }
+        },
+      })
+    );
+
+    const issued = await manager.generateAccessToken({ sub: "banned-user" });
+
+    const response = await supertest(interceptApp.server)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.token}`)
+      .expect(403);
+
+    expect(response.body.error).toBe("Forbidden");
+    expect(response.body.message).toBe("User is banned");
+
+    await interceptApp.close();
+  });
+
+  it("should throw standard 401 if onVerified throws a standard Error", async () => {
+    const throwingApp = await createTestApp(
+      fastifyVerifyToken(manager, {
+        onVerified: async () => {
+          throw new Error("Database disconnected during validation");
+        },
+      })
+    );
+
+    const issued = await manager.generateAccessToken({ sub: "user-1" });
+
+    const response = await supertest(throwingApp.server)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.token}`)
+      .expect(500);
+
+    expect(response.body.message).toMatch(/Database disconnected/);
+
+    await throwingApp.close();
   });
 });
