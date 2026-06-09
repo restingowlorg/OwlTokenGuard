@@ -7,6 +7,10 @@ export {
   expressVerifyToken,
   validateTokenMiddleware,
 } from "./middlewares/express";
+export {
+  fastifyVerifyToken,
+  validateTokenPreHandler,
+} from "./middlewares/fastify";
 
 // Types
 export * from "./core/types";
