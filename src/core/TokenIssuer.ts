@@ -101,16 +101,19 @@ export class TokenIssuer {
       result.refreshToken = refresh.refreshToken;
       result.refreshClaims = refresh.refreshClaims;
 
-      const onRefreshTokenIssued =
-        options.onRefreshTokenIssued ?? this.config.onRefreshTokenIssued;
-      if (onRefreshTokenIssued) {
-        await onRefreshTokenIssued({
-          refreshToken: refresh.refreshToken,
-          refreshClaims: refresh.refreshClaims,
-          accessClaims: standardClaims,
-          payload,
-          expiresAt: refresh.expiresAt,
-        });
+      if (this.config.onRefreshTokenIssued) {
+        try {
+          await this.config.onRefreshTokenIssued({
+            refreshToken: refresh.refreshToken,
+            refreshClaims: refresh.refreshClaims,
+            accessClaims: standardClaims,
+            payload,
+            expiresAt: refresh.expiresAt,
+          });
+        } catch (error) {
+          this.logger.error("[TokenIssuer] refresh token persistence failed:", error);
+          throw new TokenGenerationError("Refresh token persistence failed");
+        }
       }
     }
 
@@ -134,11 +137,12 @@ export class TokenIssuer {
 
     const now = Math.floor(Date.now() / 1000);
     const jti = randomUUID();
+    const expiresAt = now + expiresIn;
     const refreshClaims: StandardClaims = { iat: now, nbf: now, jti };
     const jwtPayload: Record<string, unknown> = {
       ...refreshClaims,
       token_use: "refresh",
-      exp: now + expiresIn,
+      exp: expiresAt,
     };
 
     if (typeof payload.sub === "string") {
@@ -148,7 +152,7 @@ export class TokenIssuer {
     return {
       refreshToken: signJwt(jwtPayload, signingMaterial),
       refreshClaims,
-      expiresAt: now + expiresIn,
+      expiresAt,
     };
   }
 

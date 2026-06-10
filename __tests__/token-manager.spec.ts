@@ -80,6 +80,75 @@ describe("TokenManager.generateAccessToken", () => {
     expect(refreshClaims.jti).not.toBe(result.claims.jti);
   });
 
+  it("should invoke onRefreshTokenIssued before returning tokens", async () => {
+    const saved: Array<{
+      refreshJti: string;
+      accessJti: string;
+      sub?: string;
+      expiresAt: number;
+    }> = [];
+
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async (context) => {
+        saved.push({
+          refreshJti: context.refreshClaims.jti,
+          accessJti: context.accessClaims.jti,
+          sub: typeof context.payload.sub === "string" ? context.payload.sub : undefined,
+          expiresAt: context.expiresAt,
+        });
+      },
+    });
+
+    const result = await manager.generateAccessToken({ sub: "user-db" });
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].refreshJti).toBe(result.refreshClaims?.jti);
+    expect(saved[0].accessJti).toBe(result.claims.jti);
+    expect(saved[0].sub).toBe("user-db");
+    expect(saved[0].expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
+  });
+
+  it("should fail issuance when onRefreshTokenIssued throws", async () => {
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async () => {
+        throw new Error("database unavailable");
+      },
+    });
+
+    await expect(manager.generateAccessToken({ sub: "user-fail" })).rejects.toThrow(
+      /Refresh token persistence failed/i,
+    );
+  });
+
+  it("should invoke onRefreshTokenIssued from generate compatibility wrapper", async () => {
+    const saved: string[] = [];
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async (context) => {
+        saved.push(context.refreshClaims.jti);
+      },
+    });
+
+    const result = await manager.generate({ sub: "user-generate" });
+
+    expect(saved).toEqual([result.refreshClaims?.jti]);
+    expect(result.referenceToken).toBeDefined();
+  });
+
   it("should issue access and refresh tokens when refresh tokens are enabled", async () => {
     const manager = createTokenManager({
       algorithm: "HS256",
@@ -100,68 +169,6 @@ describe("TokenManager.generateAccessToken", () => {
     expect(accessClaims.token_use).toBe("access");
     expect(refreshClaims.token_use).toBe("refresh");
     expect(accessClaims.jti).not.toBe(refreshClaims.jti);
-  });
-
-  it("should invoke onRefreshTokenIssued so developers can persist refresh tokens", async () => {
-    const persisted: Array<{
-      refreshJti: string;
-      accessJti: string;
-      sub: string;
-      expiresAt: number;
-    }> = [];
-
-    const manager = createTokenManager({
-      algorithm: "HS256",
-      hmacSecret: TEST_HMAC_SECRET,
-      expiresInSeconds: 3600,
-      refreshTokenEnabled: true,
-      refreshTokenExpiresInSeconds: 86400,
-      onRefreshTokenIssued: async ({
-        refreshToken,
-        refreshClaims,
-        accessClaims,
-        payload,
-        expiresAt,
-      }) => {
-        persisted.push({
-          refreshJti: refreshClaims.jti,
-          accessJti: accessClaims.jti,
-          sub: payload.sub as string,
-          expiresAt,
-        });
-        expect(refreshToken.split(".")).toHaveLength(3);
-      },
-    });
-
-    const result = await manager.generateAccessToken({ sub: "user-db" });
-
-    expect(persisted).toEqual([
-      {
-        refreshJti: result.refreshClaims!.jti,
-        accessJti: result.claims.jti,
-        sub: "user-db",
-        expiresAt: decodeUnsafeJwtPayload(result.refreshToken!).exp,
-      },
-    ]);
-  });
-
-  it("should invoke onRefreshTokenIssued from generate when refresh tokens are enabled", async () => {
-    let refreshJti: string | undefined;
-
-    const manager = createTokenManager({
-      algorithm: "HS256",
-      hmacSecret: TEST_HMAC_SECRET,
-      expiresInSeconds: 3600,
-      refreshTokenEnabled: true,
-      refreshTokenExpiresInSeconds: 86400,
-      onRefreshTokenIssued: async ({ refreshClaims }) => {
-        refreshJti = refreshClaims.jti;
-      },
-    });
-
-    const result = await manager.generate({ sub: "user-generate" });
-
-    expect(refreshJti).toBe(result.refreshClaims?.jti);
   });
 });
 

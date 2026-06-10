@@ -92,18 +92,35 @@ describe("generate token (usage)", () => {
   });
 
   describe("session rotation", () => {
-    it("should issue a new access token on every generateAccessToken call", async () => {
+    it("should issue a new access and refresh token on every generateAccessToken call", async () => {
+      const DummyCacheOrDatabase: string[] = [];
       const manager = createTokenManager({
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
         expiresInSeconds: 3600,
+        refreshTokenEnabled: true,
+        refreshTokenExpiresInSeconds: 86400,
+        onRefreshTokenIssued: async ({ refreshClaims }) => {
+          /**
+           * apply database or chashes to save refresh token jti for later verification
+           * every times if generateded a refresh token always call this callback to save the refresh token jti for later verification
+           */
+          DummyCacheOrDatabase.push(refreshClaims.jti);
+        },
       });
 
       const a = await manager.generateAccessToken({ sub: "user-789" });
-      const b = await manager.generateAccessToken({ sub: "user-789" });
+      const b = await manager.generateAccessToken(
+        { sub: "user-789" },
+        { previousSession: a.claims },
+      );
 
       expect(a.token).not.toBe(b.token);
+      expect(a.refreshToken).not.toBe(b.refreshToken);
       expect(a.claims.jti).not.toBe(b.claims.jti);
+      expect(a.refreshClaims?.jti).not.toBe(b.refreshClaims?.jti);
+      expect(DummyCacheOrDatabase).toContain(a.refreshClaims?.jti);
+      expect(DummyCacheOrDatabase).toContain(b.refreshClaims?.jti);
     });
 
     it("should issue both tokens via generate compatibility wrapper", async () => {

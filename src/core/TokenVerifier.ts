@@ -8,12 +8,17 @@ function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-function normalizeDeclaredTokenType(value: string): TokenPurpose | undefined {
+type DeclaredTokenType = TokenPurpose | "refresh";
+
+function normalizeDeclaredTokenType(value: string): DeclaredTokenType | undefined {
   if (value === "access" || value === "at+jwt") {
     return "access";
   }
   if (value === "id" || value === "id+jwt") {
     return "id";
+  }
+  if (value === "refresh") {
+    return "refresh";
   }
   return undefined;
 }
@@ -87,7 +92,7 @@ export class TokenVerifier {
     const requireTemporal =
       options.requireTemporalClaims ??
       this.config.requireTemporalClaims ??
-      options.purpose === "access";
+      (options.purpose === "access" || options.purpose === "refresh");
     const tolerance =
       options.clockToleranceSeconds ??
       this.config.clockToleranceSeconds ??
@@ -196,6 +201,12 @@ export class TokenVerifier {
     if (purpose === "id" && effective === "access") {
       throw new TokenVerificationError(
         "Access token cannot be used as an ID token",
+      );
+    }
+
+    if (purpose === "refresh" && effective !== "refresh") {
+      throw new TokenVerificationError(
+        "Token cannot be used as a refresh token",
       );
     }
   }

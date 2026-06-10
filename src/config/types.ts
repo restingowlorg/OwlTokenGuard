@@ -2,8 +2,11 @@ import type { SigningAlgorithm } from "../security/AlgorithmGuard";
 import type { ReferenceTokenEncoding } from "../generators/types";
 import type { PayloadCipher } from "../ciphering/PayloadCipher";
 import type { ILogger } from "../utils/Logger";
+import type {
+  RefreshTokenConsumeContext,
+  RefreshTokenIssuanceContext,
+} from "../core/types";
 import type { VerificationPolicy } from "../validation/types";
-import type { RefreshTokenIssuedContext } from "../core/types";
 
 export type SigningKeyMaterial =
   | { type: "symmetric"; secret: string }
@@ -24,19 +27,26 @@ export interface TokenConfig extends VerificationPolicy {
   failOnCipherError?: boolean;
   /** Invoked when rotating sessions via `previousSession`. */
   onSessionTerminate?: (context: { jti: string }) => Promise<void>;
-  /**
-   * Invoked after a refresh token is generated — persist it server-side (e.g. database).
-   * Only runs when `refreshTokenEnabled` is true.
-   */
-  onRefreshTokenIssued?: (
-    context: RefreshTokenIssuedContext,
-  ) => Promise<void> | void;
   /** Required `exp` claim offset in seconds from issuance. */
   expiresInSeconds: number;
   /** Issue a refresh JWT alongside each access token. */
   refreshTokenEnabled?: boolean;
   /** Refresh token `exp` offset in seconds from issuance. */
   refreshTokenExpiresInSeconds?: number;
+  /**
+   * Invoked after a refresh token is generated — persist it (e.g. database)
+   * before the issuance result is returned to the caller.
+   */
+  onRefreshTokenIssued?: (
+    context: RefreshTokenIssuanceContext,
+  ) => Promise<void>;
+  /**
+   * Invoked at the start of `rotate()` — atomically mark the refresh token as consumed.
+   * Return `true` to continue rotation, `false` if the token was already used.
+   */
+  consumeRefreshToken?: (
+    context: RefreshTokenConsumeContext,
+  ) => Promise<boolean>;
   debug?: boolean;
   customLogger?: ILogger;
 }

@@ -1,7 +1,7 @@
 import type { SigningAlgorithm } from "../security/AlgorithmGuard";
 import type { StandardClaims, TokenPayload } from "../core/types";
 
-export type TokenPurpose = "access" | "id";
+export type TokenPurpose = "access" | "id" | "refresh";
 
 export interface VerificationPolicy {
   /** Strict algorithm allowlist for incoming tokens (defaults to library supported set). */

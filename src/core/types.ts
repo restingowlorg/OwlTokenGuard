@@ -15,13 +15,13 @@ export type SessionHandle = StandardClaims | { jti: string };
 
 export type TokenPayload = Record<string, unknown>;
 
-/** Context passed to `onRefreshTokenIssued` for server-side persistence. */
-export interface RefreshTokenIssuedContext {
+/** Context passed to `onRefreshTokenIssued` for database persistence. */
+export interface RefreshTokenIssuanceContext {
   refreshToken: string;
   refreshClaims: StandardClaims;
   accessClaims: StandardClaims;
   payload: TokenPayload;
-  /** Refresh token expiry as Unix seconds. */
+  /** Refresh token `exp` as a Unix timestamp in seconds. */
   expiresAt: number;
 }
 
@@ -30,10 +30,6 @@ export interface AccessTokenOptions {
   previousSession?: SessionHandle;
   /** Not-before offset in seconds from now. */
   nbfOffsetSeconds?: number;
-  /** Override configured refresh-token persistence hook for this issuance. */
-  onRefreshTokenIssued?: (
-    context: RefreshTokenIssuedContext,
-  ) => Promise<void> | void;
 }
 
 export interface ReferenceIssuanceOptions {
@@ -65,4 +61,33 @@ export interface SessionReferenceResult {
 /** Combined issuance result — use when both access and reference tokens are required. */
 export interface TokenResult extends AccessTokenResult {
   referenceToken: string;
+}
+
+/** Context passed to `consumeRefreshToken` during rotation. */
+export interface RefreshTokenConsumeContext {
+  jti: string;
+  sub: string;
+  exp: number;
+  iat: number;
+}
+
+export interface RotateOptions {
+  /** Not-before offset in seconds from now for the new access token. */
+  nbfOffsetSeconds?: number;
+}
+
+/** RFC 6749 token response — return directly from `POST /auth/refresh`. */
+export interface OAuthTokenResponse {
+  access_token: string;
+  token_type: "Bearer";
+  expires_in: number;
+  refresh_token: string;
+}
+
+/** Result of `rotate()` — library fields plus OAuth-standard `oauth` payload. */
+export interface RotateResult extends AccessTokenResult {
+  refreshToken: string;
+  refreshClaims: StandardClaims;
+  previousRefreshJti: string;
+  oauth: OAuthTokenResponse;
 }
