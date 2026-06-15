@@ -3,24 +3,61 @@ import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
 
+const databaseOrCahsh = new Set<string>();
+
+const tokenManager = createTokenManager({
+  algorithm: "HS256",
+  hmacSecret: TEST_HMAC_SECRET,
+  expiresInSeconds: 900,
+  refreshTokenEnabled: true,
+  refreshTokenExpiresInSeconds: 604800,
+  onRefreshTokenIssued: async ({ refreshClaims }) => {
+    /**
+     * save the refresh token jti to the database or cache
+     */
+    databaseOrCahsh.add(refreshClaims.jti);
+  },
+  consumeRefreshToken: async ({ jti }) => {
+    /**
+     * check if the refresh token has already been used in the database or cache
+     * if it has, return false
+     * if it has not, return true
+     */
+    if (databaseOrCahsh.has(jti)) return false;
+    databaseOrCahsh.add(jti);
+    return true;
+  },
+});
+
 function createRefreshManager(overrides: Partial<TokenConfig> = {}) {
+  const { consumeRefreshToken, ...rest } = overrides;
+
   return createTokenManager({
     algorithm: "HS256",
     hmacSecret: TEST_HMAC_SECRET,
     expiresInSeconds: 900,
     refreshTokenEnabled: true,
     refreshTokenExpiresInSeconds: 604800,
-    ...overrides,
+    ...rest,
+    consumeRefreshToken:
+      consumeRefreshToken ??
+      (async ({ jti }) => {
+        if (databaseOrCahsh.has(jti)) return false;
+        databaseOrCahsh.add(jti);
+        return true;
+      }),
   });
 }
 
 describe("TokenManager.rotate", () => {
+  beforeEach(() => {
+    databaseOrCahsh.clear();
+  });
+
   it("should return a new access/refresh pair with OAuth-standard fields", async () => {
-    const manager = createRefreshManager();
+    const login = await tokenManager.generateAccessToken({ sub: "user-1" });
 
-    const login = await manager.generateAccessToken({ sub: "user-1" });
-
-    const rotated = await manager.rotate(login.refreshToken!);
+    const rotated = await tokenManager.rotate(login.refreshToken!);
 
     expect(rotated.token).not.toBe(login.token);
     expect(rotated.refreshToken).not.toBe(login.refreshToken);
@@ -73,28 +110,18 @@ describe("TokenManager.rotate", () => {
   });
 
   it("should reject an access token presented to rotate()", async () => {
-    const manager = createRefreshManager();
-    const login = await manager.generateAccessToken({ sub: "user-4" });
+    const login = await tokenManager.generateAccessToken({ sub: "user-4" });
 
-    await expect(manager.rotate(login.token)).rejects.toThrow(
+    await expect(tokenManager.rotate(login.token)).rejects.toThrow(
       /cannot be used as a refresh token/i,
     );
   });
 
   it("should reject when consumeRefreshToken returns false", async () => {
-    const usedForRotation = new Set<string>();
-    const manager = createRefreshManager({
-      consumeRefreshToken: async ({ jti }) => {
-        if (usedForRotation.has(jti)) return false;
-        usedForRotation.add(jti);
-        return true;
-      },
-    });
+    const login = await tokenManager.generateAccessToken({ sub: "user-5" });
+    await tokenManager.rotate(login.refreshToken!);
 
-    const login = await manager.generateAccessToken({ sub: "user-5" });
-    await manager.rotate(login.refreshToken!);
-
-    await expect(manager.rotate(login.refreshToken!)).rejects.toThrow(
+    await expect(tokenManager.rotate(login.refreshToken!)).rejects.toThrow(
       /already been used/i,
     );
   });
@@ -123,25 +150,3 @@ describe("TokenManager.rotate", () => {
     await expect(manager.rotate(login.refreshToken!)).rejects.toThrow(/revoked/i);
   });
 });
-
-
-// Express route
-// app.post("/auth/refresh", async (req, res) => {
-//   const refreshToken = req.cookies.refresh_token ?? req.body.refresh_token;
-//   if (!refreshToken) {
-//     return res.status(400).json({ error: "invalid_request", error_description: "Missing refresh token" });
-//   }
-//   try {
-//     const result = await tokenManager.rotate(refreshToken);
-//     // RFC 6749 OAuth token response
-//     return res.json(result.oauth);
-//      {
-//        "access_token": "...",
-//        "token_type": "Bearer",
-//        "expires_in": 900,
-//        "refresh_token": "..."
-//     }
-//   } catch {
-//     return res.status(401).json({ error: "invalid_grant", error_description: "Invalid or expired refresh token" });
-//   }
-// });
