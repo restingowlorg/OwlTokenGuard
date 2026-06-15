@@ -1,5 +1,6 @@
 import { TokenIssuer } from "./TokenIssuer";
 import { TokenRotator } from "./TokenRotator";
+import { TokenTerminator } from "./TokenTerminator";
 import { TokenVerifier } from "./TokenVerifier";
 import type { TokenConfig } from "../config/types";
 import { validateConfig } from "../config/validation";
@@ -14,6 +15,7 @@ import type {
   SessionHandle,
   RotateOptions,
   RotateResult,
+  RevokeTokenOptions,
 } from "./types";
 import type { VerifyOptions, VerifyResult } from "../validation/types";
 
@@ -24,6 +26,7 @@ export class TokenManager {
   private readonly issuer: TokenIssuer;
   private readonly verifier: TokenVerifier;
   private readonly rotator: TokenRotator;
+  private readonly terminator: TokenTerminator;
 
   private constructor(
     public readonly config: TokenConfig,
@@ -31,13 +34,19 @@ export class TokenManager {
       issuer?: TokenIssuer;
       verifier?: TokenVerifier;
       rotator?: TokenRotator;
+      terminator?: TokenTerminator;
     },
   ) {
-    this.issuer = dependencies?.issuer ?? new TokenIssuer(config);
     this.verifier = dependencies?.verifier ?? new TokenVerifier(config);
+    this.terminator =
+      dependencies?.terminator ??
+      new TokenTerminator(config, this.verifier);
+    this.issuer =
+      dependencies?.issuer ??
+      new TokenIssuer(config, { terminator: this.terminator });
     this.rotator =
       dependencies?.rotator ??
-      new TokenRotator(config, this.issuer, this.verifier);
+      new TokenRotator(config, this.issuer, this.verifier, this.terminator);
   }
 
   /** Validated construction — prefer `createTokenManager()` from the factory. */
@@ -47,6 +56,7 @@ export class TokenManager {
       issuer?: TokenIssuer;
       verifier?: TokenVerifier;
       rotator?: TokenRotator;
+      terminator?: TokenTerminator;
     },
   ): TokenManager {
     validateConfig(config);
@@ -89,8 +99,22 @@ export class TokenManager {
     return this.rotator.rotate(refreshToken, options);
   }
 
+  /**
+   * Revoke a session by jti or verified claims.
+   * Configure `onSessionTerminate` to remove the session from your store.
+   */
   async terminate(session: SessionHandle): Promise<void> {
-    return this.issuer.terminate(session);
+    return this.terminator.terminate(session);
+  }
+
+  /**
+   * Verify a JWT and revoke its session — use from `POST /auth/logout`.
+   */
+  async revokeToken(
+    token: string,
+    options?: RevokeTokenOptions,
+  ): Promise<void> {
+    return this.terminator.revokeToken(token, options);
   }
 
   async shutdown(): Promise<void> {

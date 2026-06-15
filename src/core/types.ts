@@ -76,6 +76,11 @@ export interface RotateOptions {
   nbfOffsetSeconds?: number;
 }
 
+export interface RevokeTokenOptions {
+  /** Enforce token_use during verification (e.g. `"refresh"` for logout cookies). */
+  purpose?: "access" | "id" | "refresh";
+}
+
 /** RFC 6749 token response — return directly from `POST /auth/refresh`. */
 export interface OAuthTokenResponse {
   access_token: string;

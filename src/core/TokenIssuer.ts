@@ -9,7 +9,6 @@ import type {
   TokenResult,
   AccessTokenResult,
   SessionReferenceResult,
-  SessionHandle,
   StandardClaims,
 } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
@@ -17,16 +16,7 @@ import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
 import { AlgorithmGuard, type SigningAlgorithm } from "../security/AlgorithmGuard";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
-
-function resolveSessionJti(session: SessionHandle): string {
-  const jti = session.jti;
-  if (typeof jti !== "string" || jti.length === 0) {
-    throw new TokenGenerationError(
-      "Session handle must include a non-empty jti from issuance or verified claims",
-    );
-  }
-  return jti;
-}
+import type { TokenTerminator } from "./TokenTerminator";
 
 /**
  * Story 1.3: hardened issuance orchestration.
@@ -34,14 +24,19 @@ function resolveSessionJti(session: SessionHandle): string {
 export class TokenIssuer {
   private readonly logger: ILogger;
   private readonly referenceGenerator: ReferenceTokenGenerator;
+  private readonly terminator?: TokenTerminator;
 
   constructor(
     private readonly config: TokenConfig,
-    dependencies?: { referenceGenerator?: ReferenceTokenGenerator },
+    dependencies?: {
+      referenceGenerator?: ReferenceTokenGenerator;
+      terminator?: TokenTerminator;
+    },
   ) {
     this.logger = config.customLogger ?? new DefaultLogger(config.debug);
     this.referenceGenerator =
       dependencies?.referenceGenerator ?? new ReferenceTokenGenerator();
+    this.terminator = dependencies?.terminator;
   }
 
   /** Issue a signed JWT access token only. */
@@ -50,7 +45,7 @@ export class TokenIssuer {
     options: AccessTokenOptions = {},
   ): Promise<AccessTokenResult> {
     if (options.previousSession) {
-      await this.terminate(options.previousSession);
+      await this.terminator?.terminate(options.previousSession);
     }
 
     const algorithm = this.config.algorithm ?? defaults.algorithm;
@@ -194,17 +189,5 @@ export class TokenIssuer {
       ...access,
       referenceToken: reference.referenceToken,
     };
-  }
-
-  /**
-   * Revoke a session by server-owned jti or verified claims — not by raw JWT string.
-   */
-  async terminate(session: SessionHandle): Promise<void> {
-    const jti = resolveSessionJti(session);
-
-    if (this.config.onSessionTerminate) {
-      await this.config.onSessionTerminate({ jti });
-      this.logger.debug(`[TokenIssuer] terminated session jti=${jti}`);
-    }
   }
 }

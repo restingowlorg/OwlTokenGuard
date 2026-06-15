@@ -1,5 +1,6 @@
 import type { TokenConfig } from "../config/types";
 import type { TokenIssuer } from "./TokenIssuer";
+import type { TokenTerminator } from "./TokenTerminator";
 import type { TokenVerifier } from "./TokenVerifier";
 import type {
   OAuthTokenResponse,
@@ -53,6 +54,7 @@ export class TokenRotator {
     private readonly config: TokenConfig,
     private readonly issuer: TokenIssuer,
     private readonly verifier: TokenVerifier,
+    private readonly terminator: TokenTerminator,
   ) {}
 
   async rotate(
@@ -106,7 +108,7 @@ export class TokenRotator {
       );
     }
 
-    await this.issuer.terminate(verified.claims);
+    await this.terminator.terminate(verified.claims);
 
     return {
       token: issued.token,
