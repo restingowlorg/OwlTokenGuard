@@ -61,13 +61,114 @@ describe("TokenManager.generateAccessToken", () => {
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
       payloadCipher: new Aes256GcmCipher(encryptionKey),
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
     });
 
-    const result = await manager.generateAccessToken({ role: "admin" });
+    const result = await manager.generateAccessToken({ sub: "user-3", role: "admin" });
     const claims = decodeUnsafeJwtPayload(result.token);
+    const refreshClaims = decodeUnsafeJwtPayload(result.refreshToken!);
 
     expect(claims.enc).toBeDefined();
     expect(claims.role).toBeUndefined();
+    expect(result.refreshToken).toMatch(
+      /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+    );
+    expect(refreshClaims.token_use).toBe("refresh");
+    expect(refreshClaims.sub).toBe("user-3");
+    expect(refreshClaims.jti).toBe(result.refreshClaims?.jti);
+    expect(refreshClaims.jti).not.toBe(result.claims.jti);
+  });
+
+  it("should invoke onRefreshTokenIssued before returning tokens", async () => {
+    const saved: Array<{
+      refreshJti: string;
+      accessJti: string;
+      sub?: string;
+      expiresAt: number;
+    }> = [];
+
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async (context) => {
+        saved.push({
+          refreshJti: context.refreshClaims.jti,
+          accessJti: context.accessClaims.jti,
+          sub: typeof context.payload.sub === "string" ? context.payload.sub : undefined,
+          expiresAt: context.expiresAt,
+        });
+      },
+    });
+
+    const result = await manager.generateAccessToken({ sub: "user-db" });
+
+    expect(saved).toHaveLength(1);
+    expect(saved[0].refreshJti).toBe(result.refreshClaims?.jti);
+    expect(saved[0].accessJti).toBe(result.claims.jti);
+    expect(saved[0].sub).toBe("user-db");
+    expect(saved[0].expiresAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
+  });
+
+  it("should fail issuance when onRefreshTokenIssued throws", async () => {
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async () => {
+        throw new Error("database unavailable");
+      },
+    });
+
+    await expect(manager.generateAccessToken({ sub: "user-fail" })).rejects.toThrow(
+      /Refresh token persistence failed/i,
+    );
+  });
+
+  it("should invoke onRefreshTokenIssued from generate compatibility wrapper", async () => {
+    const saved: string[] = [];
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+      onRefreshTokenIssued: async (context) => {
+        saved.push(context.refreshClaims.jti);
+      },
+    });
+
+    const result = await manager.generate({ sub: "user-generate" });
+
+    expect(saved).toEqual([result.refreshClaims?.jti]);
+    expect(result.referenceToken).toBeDefined();
+  });
+
+  it("should issue access and refresh tokens when refresh tokens are enabled", async () => {
+    const manager = createTokenManager({
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      expiresInSeconds: 3600,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+    });
+
+    const result = await manager.generateAccessToken({ sub: "user-refresh" });
+    const accessClaims = decodeUnsafeJwtPayload(result.token);
+    const refreshClaims = decodeUnsafeJwtPayload(result.refreshToken!);
+
+    expect(result.refreshToken).toBeDefined();
+    expect(result.refreshClaims).toEqual(
+      expect.objectContaining({ jti: refreshClaims.jti }),
+    );
+    expect(accessClaims.token_use).toBe("access");
+    expect(refreshClaims.token_use).toBe("refresh");
+    expect(accessClaims.jti).not.toBe(refreshClaims.jti);
   });
 });
 

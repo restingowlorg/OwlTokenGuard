@@ -1,5 +1,6 @@
 import type { TokenConfig } from "../config/types";
 import type { VerifyOptions, VerifyResult, TokenPurpose } from "../validation/types";
+import { REAUTH_AT_CLAIM } from "./types";
 import { verifyJwtSignatureFirst } from "../jwt/JwtVerifier";
 import { TokenVerificationError } from "../errors/TokenVerificationError";
 import type { EncryptedPayload } from "../ciphering/types";
@@ -8,12 +9,17 @@ function nowSeconds(): number {
   return Math.floor(Date.now() / 1000);
 }
 
-function normalizeDeclaredTokenType(value: string): TokenPurpose | undefined {
+type DeclaredTokenType = TokenPurpose | "refresh";
+
+function normalizeDeclaredTokenType(value: string): DeclaredTokenType | undefined {
   if (value === "access" || value === "at+jwt") {
     return "access";
   }
   if (value === "id" || value === "id+jwt") {
     return "id";
+  }
+  if (value === "refresh") {
+    return "refresh";
   }
   return undefined;
 }
@@ -40,8 +46,40 @@ export class TokenVerifier {
       throw new TokenVerificationError("JWT is missing required jti claim");
     }
 
+    const iat = payload.iat;
+    if (typeof iat !== "number") {
+      throw new TokenVerificationError("JWT is missing required iat claim");
+    }
+
+    const sub = typeof payload.sub === "string" ? payload.sub : undefined;
+    const nbf = typeof payload.nbf === "number" ? payload.nbf : undefined;
+    const exp = typeof payload.exp === "number" ? payload.exp : undefined;
+
+    await this.assertReauthFreshness(payload, sub, options);
+
+    if (sub && this.config.getTokensInvalidBefore) {
+      const cutoff = await this.config.getTokensInvalidBefore(sub);
+      if (cutoff !== undefined && iat < cutoff) {
+        throw new TokenVerificationError(
+          "Token was issued before the session invalidation cutoff",
+        );
+      }
+    }
+
     if (this.config.isSessionRevoked) {
-      const revoked = await this.config.isSessionRevoked(jti);
+      const reauthAt =
+        typeof payload[REAUTH_AT_CLAIM] === "number"
+          ? payload[REAUTH_AT_CLAIM]
+          : undefined;
+
+      const revoked = await this.config.isSessionRevoked({
+        jti,
+        iat,
+        sub,
+        nbf,
+        exp,
+        reauthAt,
+      });
       if (revoked) {
         throw new TokenVerificationError("Session has been revoked");
       }
@@ -87,7 +125,7 @@ export class TokenVerifier {
     const requireTemporal =
       options.requireTemporalClaims ??
       this.config.requireTemporalClaims ??
-      options.purpose === "access";
+      (options.purpose === "access" || options.purpose === "refresh");
     const tolerance =
       options.clockToleranceSeconds ??
       this.config.clockToleranceSeconds ??
@@ -198,6 +236,46 @@ export class TokenVerifier {
         "Access token cannot be used as an ID token",
       );
     }
+
+    if (purpose === "refresh" && effective !== "refresh") {
+      throw new TokenVerificationError(
+        "Token cannot be used as a refresh token",
+      );
+    }
+  }
+
+  private async assertReauthFreshness(
+    payload: Record<string, unknown>,
+    sub: string | undefined,
+    options: VerifyOptions,
+  ): Promise<void> {
+    const reauthAt = payload[REAUTH_AT_CLAIM];
+    const requireClaim =
+      options.requireReauthAtClaim ??
+      this.config.requireReauthAtClaim ??
+      this.config.getMinimumReauthAt !== undefined;
+
+    if (requireClaim && typeof reauthAt !== "number") {
+      throw new TokenVerificationError(
+        "JWT is missing required reauth_at claim",
+      );
+    }
+
+    if (typeof reauthAt !== "number") {
+      return;
+    }
+
+    const minimum =
+      options.minimumReauthAt ??
+      (sub && this.config.getMinimumReauthAt
+        ? await this.config.getMinimumReauthAt(sub)
+        : undefined);
+
+    if (minimum !== undefined && reauthAt < minimum) {
+      throw new TokenVerificationError(
+        "Token is stale — reauthentication required after account change",
+      );
+    }
   }
 
   private extractStandardClaims(
@@ -221,6 +299,10 @@ export class TokenVerifier {
       iat,
       nbf,
       jti,
+      reauth_at:
+        typeof payload[REAUTH_AT_CLAIM] === "number"
+          ? payload[REAUTH_AT_CLAIM]
+          : undefined,
       exp: typeof payload.exp === "number" ? payload.exp : undefined,
       iss: typeof payload.iss === "string" ? payload.iss : undefined,
       aud: payload.aud as string | string[] | undefined,

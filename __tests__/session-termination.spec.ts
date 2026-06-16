@@ -79,4 +79,34 @@ describe("session termination", () => {
 
     await expect(manager.terminate(first.claims)).resolves.toBeUndefined();
   });
+
+  it("should pass invalidateBefore to onSessionTerminate for cutoff policies", async () => {
+    const cutoffs: Array<{ sub?: string; invalidateBefore?: number }> = [];
+    const manager = createTokenManager({
+      expiresInSeconds: 3600,
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
+      onSessionTerminate: async (context) => {
+        cutoffs.push({
+          sub: context.sub,
+          invalidateBefore: context.invalidateBefore,
+        });
+      },
+    });
+
+    const issued = await manager.generateAccessToken({ sub: "user-cutoff" });
+    const cutoff = Math.floor(Date.now() / 1000);
+
+    await manager.terminate(issued.claims, {
+      sub: "user-cutoff",
+      invalidateBefore: cutoff,
+    });
+
+    expect(cutoffs).toEqual([
+      {
+        sub: "user-cutoff",
+        invalidateBefore: cutoff,
+      },
+    ]);
+  });
 });

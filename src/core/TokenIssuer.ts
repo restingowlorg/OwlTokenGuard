@@ -9,23 +9,15 @@ import type {
   TokenResult,
   AccessTokenResult,
   SessionReferenceResult,
-  SessionHandle,
+  StandardClaims,
 } from "./types";
+import { REAUTH_AT_CLAIM } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
 import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
 import { AlgorithmGuard, type SigningAlgorithm } from "../security/AlgorithmGuard";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
-
-function resolveSessionJti(session: SessionHandle): string {
-  const jti = session.jti;
-  if (typeof jti !== "string" || jti.length === 0) {
-    throw new TokenGenerationError(
-      "Session handle must include a non-empty jti from issuance or verified claims",
-    );
-  }
-  return jti;
-}
+import type { TokenTerminator } from "./TokenTerminator";
 
 /**
  * Story 1.3: hardened issuance orchestration.
@@ -33,14 +25,19 @@ function resolveSessionJti(session: SessionHandle): string {
 export class TokenIssuer {
   private readonly logger: ILogger;
   private readonly referenceGenerator: ReferenceTokenGenerator;
+  private readonly terminator?: TokenTerminator;
 
   constructor(
     private readonly config: TokenConfig,
-    dependencies?: { referenceGenerator?: ReferenceTokenGenerator },
+    dependencies?: {
+      referenceGenerator?: ReferenceTokenGenerator;
+      terminator?: TokenTerminator;
+    },
   ) {
     this.logger = config.customLogger ?? new DefaultLogger(config.debug);
     this.referenceGenerator =
       dependencies?.referenceGenerator ?? new ReferenceTokenGenerator();
+    this.terminator = dependencies?.terminator;
   }
 
   /** Issue a signed JWT access token only. */
@@ -49,7 +46,7 @@ export class TokenIssuer {
     options: AccessTokenOptions = {},
   ): Promise<AccessTokenResult> {
     if (options.previousSession) {
-      await this.terminate(options.previousSession);
+      await this.terminator?.terminate(options.previousSession);
     }
 
     const algorithm = this.config.algorithm ?? defaults.algorithm;
@@ -58,7 +55,8 @@ export class TokenIssuer {
     const now = Math.floor(Date.now() / 1000);
     const nbf = now + (options.nbfOffsetSeconds ?? 0);
     const jti = randomUUID();
-    const standardClaims = { iat: now, nbf, jti };
+    const standardClaims: StandardClaims = { iat: now, nbf, jti };
+    const reauthAt = resolveReauthAt(payload, options);
 
     let jwtPayload: Record<string, unknown>;
     if (this.config.payloadCipher) {
@@ -82,6 +80,11 @@ export class TokenIssuer {
       jwtPayload.exp = now + this.config.expiresInSeconds;
     }
 
+    if (reauthAt !== undefined) {
+      jwtPayload[REAUTH_AT_CLAIM] = reauthAt;
+      standardClaims.reauth_at = reauthAt;
+    }
+
     const signingMaterial = resolveSigningMaterial(
       algorithm as SigningAlgorithm,
       {
@@ -90,9 +93,74 @@ export class TokenIssuer {
       },
     );
 
-    return {
+    const result: AccessTokenResult = {
       token: signJwt(jwtPayload, signingMaterial),
       claims: standardClaims,
+    };
+
+    if (this.config.refreshTokenEnabled) {
+      const refresh = this.issueRefreshToken(payload, signingMaterial, reauthAt);
+      result.refreshToken = refresh.refreshToken;
+      result.refreshClaims = refresh.refreshClaims;
+
+      if (this.config.onRefreshTokenIssued) {
+        try {
+          await this.config.onRefreshTokenIssued({
+            refreshToken: refresh.refreshToken,
+            refreshClaims: refresh.refreshClaims,
+            accessClaims: standardClaims,
+            payload,
+            expiresAt: refresh.expiresAt,
+          });
+        } catch (error) {
+          this.logger.error("[TokenIssuer] refresh token persistence failed:", error);
+          throw new TokenGenerationError("Refresh token persistence failed");
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private issueRefreshToken(
+    payload: TokenPayload,
+    signingMaterial: ReturnType<typeof resolveSigningMaterial>,
+    reauthAt?: number,
+  ): {
+    refreshToken: string;
+    refreshClaims: StandardClaims;
+    expiresAt: number;
+  } {
+    const expiresIn = this.config.refreshTokenExpiresInSeconds;
+    if (expiresIn === undefined) {
+      throw new TokenGenerationError(
+        "refreshTokenExpiresInSeconds is required when refresh tokens are enabled",
+      );
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const jti = randomUUID();
+    const expiresAt = now + expiresIn;
+    const refreshClaims: StandardClaims = { iat: now, nbf: now, jti };
+    const jwtPayload: Record<string, unknown> = {
+      ...refreshClaims,
+      token_use: "refresh",
+      exp: expiresAt,
+    };
+
+    if (reauthAt !== undefined) {
+      jwtPayload[REAUTH_AT_CLAIM] = reauthAt;
+      refreshClaims.reauth_at = reauthAt;
+    }
+
+    if (typeof payload.sub === "string") {
+      jwtPayload.sub = payload.sub;
+    }
+
+    return {
+      refreshToken: signJwt(jwtPayload, signingMaterial),
+      refreshClaims,
+      expiresAt,
     };
   }
 
@@ -135,16 +203,15 @@ export class TokenIssuer {
       referenceToken: reference.referenceToken,
     };
   }
+}
 
-  /**
-   * Revoke a session by server-owned jti or verified claims — not by raw JWT string.
-   */
-  async terminate(session: SessionHandle): Promise<void> {
-    const jti = resolveSessionJti(session);
-
-    if (this.config.onSessionTerminate) {
-      await this.config.onSessionTerminate({ jti });
-      this.logger.debug(`[TokenIssuer] terminated session jti=${jti}`);
-    }
+function resolveReauthAt(
+  payload: TokenPayload,
+  options: AccessTokenOptions,
+): number | undefined {
+  if (options.reauthAt !== undefined) {
+    return options.reauthAt;
   }
+  const fromPayload = payload[REAUTH_AT_CLAIM];
+  return typeof fromPayload === "number" ? fromPayload : undefined;
 }
