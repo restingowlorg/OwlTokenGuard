@@ -23,11 +23,17 @@ export function createShowcaseTokenManager(
     consumeRefreshToken: async ({ jti }) => {
       return sessionStore.consumeRefreshToken(jti);
     },
-    onSessionTerminate: async ({ jti }) => {
-      await sessionStore.terminateSession(jti);
+    onSessionTerminate: async (context) => {
+      await sessionStore.terminateSession(context);
     },
-    isSessionRevoked: async (jti) => {
-      return sessionStore.isSessionRevoked(jti);
+    getTokensInvalidBefore: async (sub) => {
+      return sessionStore.getTokensInvalidBefore(sub);
+    },
+    getMinimumReauthAt: async (sub) => {
+      return sessionStore.getMinimumReauthAt(sub);
+    },
+    isSessionRevoked: async (context) => {
+      return sessionStore.isSessionRevoked(context);
     },
   });
 }

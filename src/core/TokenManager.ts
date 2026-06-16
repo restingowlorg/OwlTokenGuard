@@ -16,6 +16,7 @@ import type {
   RotateOptions,
   RotateResult,
   RevokeTokenOptions,
+  TerminateOptions,
 } from "./types";
 import type { VerifyOptions, VerifyResult } from "../validation/types";
 
@@ -103,8 +104,11 @@ export class TokenManager {
    * Revoke a session by jti or verified claims.
    * Configure `onSessionTerminate` to remove the session from your store.
    */
-  async terminate(session: SessionHandle): Promise<void> {
-    return this.terminator.terminate(session);
+  async terminate(
+    session: SessionHandle,
+    options?: TerminateOptions,
+  ): Promise<void> {
+    return this.terminator.terminate(session, options);
   }
 
   /**

@@ -108,7 +108,7 @@ export class TokenRotator {
       );
     }
 
-    await this.terminator.terminate(verified.claims);
+    await this.terminator.terminate(verified.claims, { sub });
 
     return {
       token: issued.token,

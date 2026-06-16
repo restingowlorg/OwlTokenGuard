@@ -1,10 +1,15 @@
 import type { ReferenceTokenEncoding } from "../generators/types";
 
+/** JWT claim name for last full reauthentication (Unix seconds). */
+export const REAUTH_AT_CLAIM = "reauth_at";
+
 /** JWT-style claims embedded on every issuance (Story 1.3). */
 export interface StandardClaims {
   iat: number;
   nbf: number;
   jti: string;
+  /** Present when stamped at issuance — last email/MFA reauthentication time. */
+  reauth_at?: number;
 }
 
 /**
@@ -12,6 +17,23 @@ export interface StandardClaims {
  * Use jti from issuance (`AccessTokenResult.claims`) or verified claims — never a raw JWT.
  */
 export type SessionHandle = StandardClaims | { jti: string };
+
+/** Context passed to `onSessionTerminate` for session removal or cutoff invalidation. */
+export interface SessionTerminateContext {
+  jti: string;
+  iat?: number;
+  sub?: string;
+  /**
+   * When set, persist this cutoff so verification rejects tokens with `iat` strictly before it.
+   * Use `Math.floor(Date.now() / 1000)` for logout-all-devices policies.
+   */
+  invalidateBefore?: number;
+}
+
+export interface TerminateOptions {
+  sub?: string;
+  invalidateBefore?: number;
+}
 
 export type TokenPayload = Record<string, unknown>;
 
@@ -30,6 +52,11 @@ export interface AccessTokenOptions {
   previousSession?: SessionHandle;
   /** Not-before offset in seconds from now. */
   nbfOffsetSeconds?: number;
+  /**
+   * Freshness marker (Unix seconds) stamped as `reauth_at` on access and refresh tokens.
+   * Set after email verification or MFA so older sessions can be rejected on verify.
+   */
+  reauthAt?: number;
 }
 
 export interface ReferenceIssuanceOptions {
@@ -79,6 +106,11 @@ export interface RotateOptions {
 export interface RevokeTokenOptions {
   /** Enforce token_use during verification (e.g. `"refresh"` for logout cookies). */
   purpose?: "access" | "id" | "refresh";
+  /**
+   * When set, passed to `onSessionTerminate` to invalidate tokens issued before this Unix timestamp.
+   * Omit to revoke only the presented token's `jti`.
+   */
+  invalidateBefore?: number;
 }
 
 /** RFC 6749 token response — return directly from `POST /auth/refresh`. */

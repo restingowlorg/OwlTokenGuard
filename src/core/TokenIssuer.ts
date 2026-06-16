@@ -11,6 +11,7 @@ import type {
   SessionReferenceResult,
   StandardClaims,
 } from "./types";
+import { REAUTH_AT_CLAIM } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
 import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
 import { AlgorithmGuard, type SigningAlgorithm } from "../security/AlgorithmGuard";
@@ -54,7 +55,8 @@ export class TokenIssuer {
     const now = Math.floor(Date.now() / 1000);
     const nbf = now + (options.nbfOffsetSeconds ?? 0);
     const jti = randomUUID();
-    const standardClaims = { iat: now, nbf, jti };
+    const standardClaims: StandardClaims = { iat: now, nbf, jti };
+    const reauthAt = resolveReauthAt(payload, options);
 
     let jwtPayload: Record<string, unknown>;
     if (this.config.payloadCipher) {
@@ -78,6 +80,11 @@ export class TokenIssuer {
       jwtPayload.exp = now + this.config.expiresInSeconds;
     }
 
+    if (reauthAt !== undefined) {
+      jwtPayload[REAUTH_AT_CLAIM] = reauthAt;
+      standardClaims.reauth_at = reauthAt;
+    }
+
     const signingMaterial = resolveSigningMaterial(
       algorithm as SigningAlgorithm,
       {
@@ -92,7 +99,7 @@ export class TokenIssuer {
     };
 
     if (this.config.refreshTokenEnabled) {
-      const refresh = this.issueRefreshToken(payload, signingMaterial);
+      const refresh = this.issueRefreshToken(payload, signingMaterial, reauthAt);
       result.refreshToken = refresh.refreshToken;
       result.refreshClaims = refresh.refreshClaims;
 
@@ -118,6 +125,7 @@ export class TokenIssuer {
   private issueRefreshToken(
     payload: TokenPayload,
     signingMaterial: ReturnType<typeof resolveSigningMaterial>,
+    reauthAt?: number,
   ): {
     refreshToken: string;
     refreshClaims: StandardClaims;
@@ -139,6 +147,11 @@ export class TokenIssuer {
       token_use: "refresh",
       exp: expiresAt,
     };
+
+    if (reauthAt !== undefined) {
+      jwtPayload[REAUTH_AT_CLAIM] = reauthAt;
+      refreshClaims.reauth_at = reauthAt;
+    }
 
     if (typeof payload.sub === "string") {
       jwtPayload.sub = payload.sub;
@@ -190,4 +203,15 @@ export class TokenIssuer {
       referenceToken: reference.referenceToken,
     };
   }
+}
+
+function resolveReauthAt(
+  payload: TokenPayload,
+  options: AccessTokenOptions,
+): number | undefined {
+  if (options.reauthAt !== undefined) {
+    return options.reauthAt;
+  }
+  const fromPayload = payload[REAUTH_AT_CLAIM];
+  return typeof fromPayload === "number" ? fromPayload : undefined;
 }

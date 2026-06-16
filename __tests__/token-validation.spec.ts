@@ -311,7 +311,7 @@ describe("Epic 2: validateToken / verify", () => {
       ...baseConfig,
       trustedIssuers: undefined,
       audience: undefined,
-      isSessionRevoked: async (jti) => jti === "revoked-jti",
+      isSessionRevoked: async ({ jti }) => jti === "revoked-jti",
     });
     const token = buildSignedTestJwt(
       { ...baseConfig, trustedIssuers: undefined, audience: undefined },
@@ -322,5 +322,138 @@ describe("Epic 2: validateToken / verify", () => {
     );
 
     await expect(validateToken(manager, token)).rejects.toThrow(/revoked/i);
+  });
+
+  it("should reject tokens issued before getTokensInvalidBefore cutoff", async () => {
+    const invalidBeforeBySub = new Map<string, number>([["user-cutoff", 2_000_000_000]]);
+
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      getTokensInvalidBefore: async (sub) => invalidBeforeBySub.get(sub),
+    });
+
+    const token = buildSignedTestJwt(
+      { ...baseConfig, trustedIssuers: undefined, audience: undefined },
+      {
+        sub: "user-cutoff",
+        jti: "older-token",
+        iat: 1_000_000_000,
+        nbf: 1_000_000_000,
+        exp: 9_999_999_999,
+      },
+    );
+
+    await expect(validateToken(manager, token)).rejects.toThrow(/invalidation cutoff/i);
+  });
+
+  it("should reject tokens via isSessionRevoked using iat-aware policy", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      isSessionRevoked: async ({ iat, sub }) =>
+        sub === "user-ts" && iat < 2_000_000_000,
+    });
+
+    const token = buildSignedTestJwt(
+      { ...baseConfig, trustedIssuers: undefined, audience: undefined },
+      {
+        sub: "user-ts",
+        jti: "old-session",
+        iat: 1_000_000_000,
+        nbf: 1_000_000_000,
+        exp: 9_999_999_999,
+      },
+    );
+
+    await expect(validateToken(manager, token)).rejects.toThrow(/revoked/i);
+  });
+
+  it("should stamp reauth_at when issuing with reauthAt option", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 86400,
+    });
+
+    const reauthAt = 2_000_000_000;
+    const issued = await manager.generateAccessToken({ sub: "user-fresh" }, { reauthAt });
+
+    const access = await manager.verify(issued.token, { purpose: "access" });
+    expect(access.claims.reauth_at).toBe(reauthAt);
+    expect(access.payload.reauth_at).toBe(reauthAt);
+
+    const refresh = await manager.verify(issued.refreshToken!, {
+      purpose: "refresh",
+    });
+    expect(refresh.claims.reauth_at).toBe(reauthAt);
+  });
+
+  it("should reject tokens with stale reauth_at via getMinimumReauthAt", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      getMinimumReauthAt: async (sub) =>
+        sub === "user-stale" ? 2_000_000_000 : undefined,
+    });
+
+    const token = buildSignedTestJwt(
+      { ...baseConfig, trustedIssuers: undefined, audience: undefined },
+      {
+        sub: "user-stale",
+        jti: "stale-reauth",
+        reauth_at: 1_000_000_000,
+        token_use: "access",
+      },
+    );
+
+    await expect(validateToken(manager, token)).rejects.toThrow(/stale/i);
+  });
+
+  it("should reject tokens missing reauth_at when requireReauthAtClaim is true", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      requireReauthAtClaim: true,
+    });
+
+    const token = buildSignedTestJwt(
+      { ...baseConfig, trustedIssuers: undefined, audience: undefined },
+      {
+        sub: "user-missing",
+        jti: "missing-reauth",
+        token_use: "access",
+      },
+    );
+
+    await expect(validateToken(manager, token)).rejects.toThrow(/reauth_at/i);
+  });
+
+  it("should enforce minimumReauthAt via verify options", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+    });
+
+    const token = buildSignedTestJwt(
+      { ...baseConfig, trustedIssuers: undefined, audience: undefined },
+      {
+        sub: "user-override",
+        jti: "override-reauth",
+        reauth_at: 1_500_000_000,
+        token_use: "access",
+      },
+    );
+
+    await expect(
+      manager.verify(token, { minimumReauthAt: 2_000_000_000 }),
+    ).rejects.toThrow(/stale/i);
   });
 });

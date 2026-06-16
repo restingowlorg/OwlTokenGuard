@@ -63,7 +63,12 @@ export function createShowcaseApp(
         payload.role = req.body.role;
       }
 
-      const issued = await tokenManager.generateAccessToken(payload);
+      const issued = await tokenManager.generateAccessToken(payload, {
+        reauthAt:
+          typeof req.body?.reauth_at === "number"
+            ? req.body.reauth_at
+            : Math.floor(Date.now() / 1000),
+      });
 
       return res.status(200).json({
         access_token: issued.token,

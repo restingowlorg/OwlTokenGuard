@@ -1,7 +1,11 @@
 import type { TokenConfig } from "../config/types";
 import type { VerifyOptions } from "../validation/types";
 import type { TokenVerifier } from "./TokenVerifier";
-import type { RevokeTokenOptions, SessionHandle } from "./types";
+import type {
+  RevokeTokenOptions,
+  SessionHandle,
+  TerminateOptions,
+} from "./types";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
 
@@ -13,6 +17,12 @@ function resolveSessionJti(session: SessionHandle): string {
     );
   }
   return jti;
+}
+
+function resolveSessionIat(session: SessionHandle): number | undefined {
+  return "iat" in session && typeof session.iat === "number"
+    ? session.iat
+    : undefined;
 }
 
 /**
@@ -32,11 +42,19 @@ export class TokenTerminator {
    * Revoke a session by jti or verified claims — not by raw JWT string.
    * Invokes `onSessionTerminate` so the developer can remove the session from storage.
    */
-  async terminate(session: SessionHandle): Promise<void> {
+  async terminate(
+    session: SessionHandle,
+    options: TerminateOptions = {},
+  ): Promise<void> {
     const jti = resolveSessionJti(session);
 
     if (this.config.onSessionTerminate) {
-      await this.config.onSessionTerminate({ jti });
+      await this.config.onSessionTerminate({
+        jti,
+        iat: resolveSessionIat(session),
+        sub: options.sub,
+        invalidateBefore: options.invalidateBefore,
+      });
       this.logger.debug(`[TokenTerminator] terminated session jti=${jti}`);
     }
   }
@@ -55,6 +73,12 @@ export class TokenTerminator {
     }
 
     const verified = await this.verifier.verify(token, verifyOptions);
-    await this.terminate(verified.claims);
+    const sub =
+      typeof verified.payload.sub === "string" ? verified.payload.sub : undefined;
+
+    await this.terminate(verified.claims, {
+      sub,
+      invalidateBefore: options.invalidateBefore,
+    });
   }
 }

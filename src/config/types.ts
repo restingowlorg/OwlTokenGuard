@@ -5,6 +5,7 @@ import type { ILogger } from "../utils/Logger";
 import type {
   RefreshTokenConsumeContext,
   RefreshTokenIssuanceContext,
+  SessionTerminateContext,
 } from "../core/types";
 import type { VerificationPolicy } from "../validation/types";
 
@@ -25,8 +26,8 @@ export interface TokenConfig extends VerificationPolicy {
   /** Optional AES-256-GCM payload encryption before signing. */
   payloadCipher?: PayloadCipher;
   failOnCipherError?: boolean;
-  /** Invoked when rotating sessions via `previousSession`. */
-  onSessionTerminate?: (context: { jti: string }) => Promise<void>;
+  /** Invoked when rotating sessions via `previousSession` or explicit termination. */
+  onSessionTerminate?: (context: SessionTerminateContext) => Promise<void>;
   /** Required `exp` claim offset in seconds from issuance. */
   expiresInSeconds: number;
   /** Issue a refresh JWT alongside each access token. */

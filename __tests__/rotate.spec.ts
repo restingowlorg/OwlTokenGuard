@@ -3,7 +3,8 @@ import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
 
-const databaseOrCahsh = new Set<string>();
+const activeRefreshJtis = new Set<string>();
+const consumedRefreshJtis = new Set<string>();
 
 const tokenManager = createTokenManager({
   algorithm: "HS256",
@@ -12,25 +13,18 @@ const tokenManager = createTokenManager({
   refreshTokenEnabled: true,
   refreshTokenExpiresInSeconds: 604800,
   onRefreshTokenIssued: async ({ refreshClaims }) => {
-    /**
-     * save the refresh token jti to the database or cache
-     */
-    databaseOrCahsh.add(refreshClaims.jti);
+    activeRefreshJtis.add(refreshClaims.jti);
   },
   consumeRefreshToken: async ({ jti }) => {
-    /**
-     * check if the refresh token has already been used in the database or cache
-     * if it has, return false
-     * if it has not, return true
-     */
-    if (databaseOrCahsh.has(jti)) return false;
-    databaseOrCahsh.add(jti);
+    if (consumedRefreshJtis.has(jti)) return false;
+    if (!activeRefreshJtis.has(jti)) return false;
+    consumedRefreshJtis.add(jti);
     return true;
   },
 });
 
 function createRefreshManager(overrides: Partial<TokenConfig> = {}) {
-  const { consumeRefreshToken, ...rest } = overrides;
+  const { consumeRefreshToken, onRefreshTokenIssued, ...rest } = overrides;
 
   return createTokenManager({
     algorithm: "HS256",
@@ -39,11 +33,16 @@ function createRefreshManager(overrides: Partial<TokenConfig> = {}) {
     refreshTokenEnabled: true,
     refreshTokenExpiresInSeconds: 604800,
     ...rest,
+    onRefreshTokenIssued: async (context) => {
+      activeRefreshJtis.add(context.refreshClaims.jti);
+      await onRefreshTokenIssued?.(context);
+    },
     consumeRefreshToken:
       consumeRefreshToken ??
       (async ({ jti }) => {
-        if (databaseOrCahsh.has(jti)) return false;
-        databaseOrCahsh.add(jti);
+        if (consumedRefreshJtis.has(jti)) return false;
+        if (!activeRefreshJtis.has(jti)) return false;
+        consumedRefreshJtis.add(jti);
         return true;
       }),
   });
@@ -51,7 +50,8 @@ function createRefreshManager(overrides: Partial<TokenConfig> = {}) {
 
 describe("TokenManager.rotate", () => {
   beforeEach(() => {
-    databaseOrCahsh.clear();
+    activeRefreshJtis.clear();
+    consumedRefreshJtis.clear();
   });
 
   it("should return a new access/refresh pair with OAuth-standard fields", async () => {
@@ -141,7 +141,7 @@ describe("TokenManager.rotate", () => {
   it("should reject a revoked refresh token via isSessionRevoked", async () => {
     const revoked = new Set<string>();
     const manager = createRefreshManager({
-      isSessionRevoked: async (jti) => revoked.has(jti),
+      isSessionRevoked: async ({ jti }) => revoked.has(jti),
     });
 
     const login = await manager.generateAccessToken({ sub: "user-6" });
