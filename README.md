@@ -1,294 +1,343 @@
+# `@restingowlorg/ossec-cryptography`
 
-```md
-# 🔐 Minimal Cryptography Library for Node.js
+Open-source OWASP-aligned token and session security library for Node.js.
 
-**OWASP ASVS Aligned · Framework-Agnostic · Clean Architecture · MVP Level 1**
+`@restingowlorg/ossec-cryptography` gives your backend a focused authentication-token surface:
+access token issuance, refresh-token rotation, token verification, middleware integration, session revocation, and freshness controls for account-security events (email / MFA changes).
 
-A **minimal, opinionated cryptography library** for Node.js applications that provides:
-
-- Secure encryption and decryption
-- Strong password / data hashing
-- Timing-safe verification
-- Clear cryptographic boundaries
-- Zero framework coupling
-
-This library is intentionally **small** and designed to be used **only at security boundaries**, not scattered across application code.
+- **Package:** `@restingowlorg/ossec-cryptography`
+- **Install:** `npm install @restingowlorg/ossec-cryptography`
+- **Runtime:** Node.js 18+
+- **Module output:** CommonJS
 
 ---
 
-## 🎯 Why This Library Exists
+## What You Get
 
-Most Node.js applications:
-
-- Misuse `crypto` primitives
-- Reuse IVs or salts incorrectly
-- Mix hashing and encryption logic
-- Leak crypto decisions across the codebase
-- Treat cryptography as a utility instead of a security boundary
-
-This library provides **one correct way** to do cryptography.
-
-> **One rule:** Cryptography must be centralized and explicit.
+- **Access + refresh issuance:** Generate access JWTs and optional refresh JWTs from one manager.
+- **Refresh token rotation (RTR):** One-time refresh consumption with OAuth-style token response.
+- **Opaque reference tokens:** Generate high-entropy backend session references when needed.
+- **Fail-shut verification:** Signature-first checks with issuer, audience, temporal, and purpose validation.
+- **Session revocation hooks:** Revoke by `jti`, token, cutoff timestamp, or custom policy.
+- **Reauthentication freshness:** Enforce `reauth_at` to mark stale sessions after email/MFA change.
+- **Framework middleware:** Express and Fastify verification middleware with typed `auth` context.
+- **Strong typing:** Predictable request/response shapes across generation, rotation, and verification.
 
 ---
 
-## ✨ Key Features
+## Support Matrix
 
-- ✅ AES-GCM authenticated encryption
-- ✅ Secure IV and salt generation
-- ✅ PBKDF2-based hashing
-- ✅ Timing-safe hash verification
-- ✅ Strong domain modeling (no raw Buffers leaking everywhere)
-- ✅ Framework-agnostic
-- ✅ Node.js `crypto` only (no third-party crypto deps)
-- ✅ OWASP ASVS aligned
-- ✅ Very small API surface
-
----
-
-## 📁 Folder Structure (MVP Level 1)
-
-```
-
-src/
-├── index.ts
-│
-├── manager/
-│   └── CryptoManager.ts
-│
-├── init/
-│   └── createCryptoLibrary.ts
-│
-├── service/
-│   └── CryptoService.ts
-│
-├── domain/
-│   ├── CipherText.ts
-│   └── HashValue.ts
-│
-├── contracts/
-│   └── CryptoProvider.ts
-│
-├── infra/
-│   └── node/
-│       └── NodeCryptoAdapter.ts
-│
-├── config/
-│   └── defaults.ts
-│
-├── errors/
-│   └── CryptoError.ts
-│
-├── types/
-│   └── index.ts
-│
-└── utils/
-└── buffers.ts
-
-````
+| Area | Current Support |
+| --- | --- |
+| Runtime | Node.js 18+ |
+| Language | TypeScript, JavaScript |
+| Module output | CommonJS |
+| Signing algorithms | HS256, HS512, RS256, ES256 |
+| HTTP frameworks | Express, Fastify |
+| Core flows | Issue, Verify, Rotate, Revoke, Terminate |
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ```bash
-npm install @restingowlorg/ossec-crypto
-````
-
-or
-
-```bash
-yarn add @restingowlorg/ossec-crypto
+npm install @restingowlorg/ossec-cryptography
 ```
 
 ---
 
-## 🧠 Core Concept
-
-Instead of directly calling `crypto` throughout your application, you use **one cryptographic facade**:
+## Quick Start
 
 ```ts
-const crypto = createCryptoLibrary({ masterKey });
+import { createTokenManager } from "@restingowlorg/ossec-cryptography";
+
+const tokenManager = createTokenManager({
+  algorithm: "HS256",
+  hmacSecret: process.env.JWT_SECRET!,
+  expiresInSeconds: 900,
+  refreshTokenEnabled: true,
+  refreshTokenExpiresInSeconds: 60 * 60 * 24 * 7,
+});
+
+const issued = await tokenManager.generateAccessToken(
+  { sub: "user-123", role: "admin" },
+  { reauthAt: Math.floor(Date.now() / 1000) },
+);
+
+const verified = await tokenManager.verify(issued.token, { purpose: "access" });
+console.log(verified.payload.sub); // "user-123"
 ```
-
-All cryptographic operations flow through this boundary.
-
-This guarantees:
-
-* Correct algorithm usage
-* Secure defaults
-* Centralized policy
-* Easy auditing
 
 ---
 
-## 🔌 Basic Usage
+## Core API
 
-### Creating the Library
+### 1) Generate Access Token
 
 ```ts
-import { createCryptoLibrary } from "@restingowlorg/ossec-crypto";
+const result = await tokenManager.generateAccessToken(
+  { sub: "user-123", role: "admin" },
+  {
+    nbfOffsetSeconds: 0,
+    reauthAt: Math.floor(Date.now() / 1000),
+  },
+);
 
-const crypto = createCryptoLibrary({
-  masterKey: Buffer.from(process.env.MASTER_KEY!, "hex")
+// result.token
+// result.claims
+// result.refreshToken (if refreshTokenEnabled)
+// result.refreshClaims (if refreshTokenEnabled)
+```
+
+### 2) Generate Access + Reference Token
+
+```ts
+const result = await tokenManager.generate({ sub: "user-123" });
+// result.token + result.referenceToken
+```
+
+### 3) Verify Token
+
+```ts
+const auth = await tokenManager.verify(token, {
+  purpose: "access",
+  audience: "my-api",
+  trustedIssuers: ["https://issuer.example"],
+});
+```
+
+### 4) Rotate Refresh Token
+
+```ts
+const rotated = await tokenManager.rotate(refreshToken);
+
+// OAuth-compatible response payload:
+// rotated.oauth = {
+//   access_token,
+//   token_type: "Bearer",
+//   expires_in,
+//   refresh_token
+// }
+```
+
+### 5) Revoke / Terminate Sessions
+
+```ts
+// Revoke using token (logout endpoint style)
+await tokenManager.revokeToken(refreshToken, { purpose: "refresh" });
+
+// Revoke using claims/jti
+await tokenManager.terminate({ jti: "session-jti" });
+```
+
+---
+
+## Express Example
+
+```ts
+import express from "express";
+import {
+  createTokenManager,
+  expressVerifyToken,
+} from "@restingowlorg/ossec-cryptography";
+
+const app = express();
+app.use(express.json());
+
+const manager = createTokenManager({
+  algorithm: "HS256",
+  hmacSecret: process.env.JWT_SECRET!,
+  expiresInSeconds: 900,
+});
+
+const requireAccessToken = expressVerifyToken(manager, { purpose: "access" });
+
+app.get("/api/me", requireAccessToken, (req, res) => {
+  res.json({
+    sub: req.auth?.payload.sub,
+    jti: req.auth?.jti,
+  });
 });
 ```
 
 ---
 
-### Encrypting Data
+## Fastify Example
 
 ```ts
-const cipherText = crypto.encrypt(
-  Buffer.from("sensitive data")
-);
+import Fastify from "fastify";
+import {
+  createTokenManager,
+  fastifyVerifyToken,
+} from "@restingowlorg/ossec-cryptography";
+
+const app = Fastify();
+
+const manager = createTokenManager({
+  algorithm: "HS256",
+  hmacSecret: process.env.JWT_SECRET!,
+  expiresInSeconds: 900,
+});
+
+const requireAccessToken = fastifyVerifyToken(manager, { purpose: "access" });
+
+app.get("/api/me", { preHandler: requireAccessToken }, async (request) => {
+  return {
+    sub: request.auth?.payload.sub,
+    jti: request.auth?.jti,
+  };
+});
 ```
 
 ---
 
-### Decrypting Data
+## Configuration Options
+
+### Core `TokenConfig`
+
+| Option | Type | Purpose |
+| --- | --- | --- |
+| `algorithm` | `SigningAlgorithm` | Select JWT signing algorithm (`HS*`, `RS256`, `ES256`) |
+| `hmacSecret` | `string` | Shared secret for symmetric signing (`HS*`) |
+| `signingKey` | key material | Private/public key material for asymmetric signing |
+| `expiresInSeconds` | `number` | Access token expiration offset |
+| `refreshTokenEnabled` | `boolean` | Enable refresh token issuance |
+| `refreshTokenExpiresInSeconds` | `number` | Refresh token expiration offset |
+| `payloadCipher` | `PayloadCipher` | Optional payload encryption before signing |
+| `onRefreshTokenIssued` | hook | Persist refresh session metadata |
+| `consumeRefreshToken` | hook | One-time refresh-token consumption check |
+| `onSessionTerminate` | hook | Session revocation / cutoff persistence |
+| `isSessionRevoked` | hook | Per-token revocation check at verification |
+| `getTokensInvalidBefore` | hook | Reject tokens with `iat` before user cutoff |
+| `requireReauthAtClaim` | `boolean` | Require `reauth_at` freshness marker |
+| `getMinimumReauthAt` | hook | Reject stale tokens with low `reauth_at` |
+
+### Verification Options (`verify`)
+
+| Option | Type | Purpose |
+| --- | --- | --- |
+| `purpose` | `"access" \| "id" \| "refresh"` | Enforce token intent |
+| `audience` | `string \| string[]` | Override audience check |
+| `trustedIssuers` | `string[]` | Override issuer allowlist |
+| `clockToleranceSeconds` | `number` | Temporal tolerance |
+| `requireTemporalClaims` | `boolean` | Require `exp` and `nbf` |
+| `requireReauthAtClaim` | `boolean` | Require `reauth_at` for this call |
+| `minimumReauthAt` | `number` | Per-request reauth freshness cutoff |
+
+---
+
+## Session Revocation and Freshness Patterns
+
+### A) Revoke by `jti`
+
+Persist revoked `jti` values and reject them in `isSessionRevoked`.
+
+### B) Invalidate All Tokens Issued Before Timestamp
+
+Use `getTokensInvalidBefore(sub)` to reject any token where `iat < cutoff`.
+
+### C) Enforce Reauthentication Freshness (`reauth_at`)
+
+When sensitive account data changes (email, MFA, recovery methods), bump a minimum freshness timestamp and reject any token with stale `reauth_at`.
 
 ```ts
-const plainText = crypto.decrypt(cipherText);
+const minimumReauthAtBySub = new Map<string, number>();
 
-plainText.toString(); // "sensitive data"
+const manager = createTokenManager({
+  algorithm: "HS256",
+  hmacSecret: process.env.JWT_SECRET!,
+  expiresInSeconds: 900,
+  getMinimumReauthAt: async (sub) => minimumReauthAtBySub.get(sub),
+});
+
+// On email change / MFA change:
+minimumReauthAtBySub.set("user-123", Math.floor(Date.now() / 1000));
 ```
 
 ---
 
-### Hashing Data (Passwords, Secrets)
+## OAuth Refresh Endpoint Example
 
 ```ts
-const hash = crypto.hash(
-  Buffer.from("my-password")
-);
+app.post("/auth/refresh", async (req, res) => {
+  const refreshToken = req.body?.refresh_token;
+  if (!refreshToken) {
+    return res.status(400).json({ error: "invalid_request" });
+  }
+
+  try {
+    const result = await manager.rotate(refreshToken);
+    return res.status(200).json(result.oauth);
+  } catch {
+    return res.status(401).json({ error: "invalid_grant" });
+  }
+});
 ```
 
 ---
 
-### Verifying a Hash
+## Error Model
+
+The package exports typed errors for robust handling:
+
+- `TokenGenerationError`
+- `TokenVerificationError`
+- `SecurityConfigurationError`
+- `UntrustedKeySourceError`
+
+Typical pattern:
 
 ```ts
-const isValid = crypto.verifyHash(
-  Buffer.from("my-password"),
-  hash
-);
-```
-
-Returns `true` or `false` using **timing-safe comparison**.
-
----
-
-## 📦 Domain Models (Why They Matter)
-
-### CipherText
-
-```ts
-CipherText {
-  value: Buffer
-  iv: Buffer
-  authTag: Buffer
+try {
+  await manager.verify(token, { purpose: "access" });
+} catch (error) {
+  if (error instanceof TokenVerificationError) {
+    // return 401
+  }
+  throw error;
 }
 ```
 
-Prevents:
+---
 
-* Losing authentication tags
-* Passing raw encrypted buffers without metadata
-* Incorrect decryption attempts
+## OWASP Alignment (Practical)
+
+This library is built around secure defaults and fail-shut behavior for token handling:
+
+- Signature-first verification before trust
+- Strong algorithm controls and allowlists
+- Strict issuer/audience/temporal checks
+- Purpose checks (`access` vs `id` vs `refresh`)
+- Replay-resistant refresh rotation via one-time consumption hook
+- Server-controlled revocation and freshness invalidation paths
+
+It is **not** an OWASP certification and does not replace full application controls.
 
 ---
 
-### HashValue
+## Security Notes
 
-```ts
-HashValue {
-  value: Buffer
-  salt: Buffer
-}
+You still need to implement:
+
+- TLS / secure transport
+- secure key storage / rotation
+- brute-force protection and rate limits
+- CSRF protections where applicable
+- account recovery hardening
+- role/authorization enforcement
+
+---
+
+## Development
+
+```bash
+npm run test
+npm run typecheck
+npm run build
 ```
 
-Prevents:
-
-* Salt reuse bugs
-* Incorrect verification logic
-* Primitive obsession
-
 ---
 
-## 🔐 Secure Defaults
-
-All defaults live in one place:
-
-```ts
-config/defaults.ts
-```
-
-Includes:
-
-* AES-256-GCM
-* Random IV per encryption
-* PBKDF2 with high iteration count
-* Strong digest algorithms
-
-No magic numbers.
-No hidden behavior.
-
----
-
-## 🔍 OWASP ASVS Alignment
-
-| Requirement Area        | Coverage              |
-| ----------------------- | --------------------- |
-| Cryptographic Storage   | ✅ Strong encryption   |
-| Key Management          | ✅ Explicit master key |
-| Randomness              | ✅ crypto.randomBytes  |
-| Password Storage        | ✅ PBKDF2 with salt    |
-| Side-Channel Resistance | ✅ timingSafeEqual     |
-
----
-
-## ⚠️ What This Library Does NOT Do
-
-* ❌ No key management system (KMS)
-* ❌ No key rotation
-* ❌ No password policy enforcement
-* ❌ No JWT handling
-* ❌ No encoding / serialization opinions
-
-This is intentional.
-
----
-
-## 🧠 Design Philosophy
-
-* Cryptography is **not a utility**
-* Explicit is safer than convenient
-* Domain models > raw primitives
-* One secure way > many flexible ways
-
----
-
-## 🧩 When to Use This Library
-
-* Encrypting sensitive data at rest
-* Hashing passwords or secrets
-* Verifying credentials
-* Application-level cryptographic boundaries
-
----
-
-## 🧩 When NOT to Use It
-
-* TLS / transport security
-* High-performance bulk encryption
-* Client-side cryptography
-* Custom algorithm experimentation
-
----
-
-## 📜 License
+## License
 
 MIT
-
-```
