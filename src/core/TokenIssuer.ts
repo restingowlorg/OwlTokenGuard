@@ -14,7 +14,10 @@ import type {
 import { REAUTH_AT_CLAIM } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
 import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
-import { AlgorithmGuard, type SigningAlgorithm } from "../security/AlgorithmGuard";
+import {
+  AlgorithmGuard,
+  type SigningAlgorithm,
+} from "../security/AlgorithmGuard";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
 import type { TokenTerminator } from "./TokenTerminator";
@@ -99,7 +102,11 @@ export class TokenIssuer {
     };
 
     if (this.config.refreshTokenEnabled) {
-      const refresh = this.issueRefreshToken(payload, signingMaterial, reauthAt);
+      const refresh = this.issueRefreshToken(
+        payload,
+        signingMaterial,
+        reauthAt,
+      );
       result.refreshToken = refresh.refreshToken;
       result.refreshClaims = refresh.refreshClaims;
 
@@ -113,7 +120,10 @@ export class TokenIssuer {
             expiresAt: refresh.expiresAt,
           });
         } catch (error) {
-          this.logger.error("[TokenIssuer] refresh token persistence failed:", error);
+          this.logger.error(
+            "[TokenIssuer] refresh token persistence failed:",
+            error,
+          );
           throw new TokenGenerationError("Refresh token persistence failed");
         }
       }

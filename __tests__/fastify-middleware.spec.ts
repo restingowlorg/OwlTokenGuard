@@ -22,14 +22,10 @@ async function createTestApp(
 
   app.get("/public", async () => ({ ok: true }));
 
-  app.get(
-    "/api/profile",
-    { preHandler: middleware },
-    async (request) => ({
-      sub: request.auth?.payload.sub,
-      jti: request.auth?.jti,
-    }),
-  );
+  app.get("/api/profile", { preHandler: middleware }, async (request) => ({
+    sub: request.auth?.payload.sub,
+    jti: request.auth?.jti,
+  }));
 
   await app.ready();
   return app;
@@ -46,7 +42,7 @@ describe("fastifyVerifyToken middleware", () => {
         // continueHook is not needed for Fastify to work
         onVerified: async (_result, _request, _reply) => {
           // if needed, add additional validation here
-        }
+        },
       }),
     );
   });
@@ -61,7 +57,9 @@ describe("fastifyVerifyToken middleware", () => {
   });
 
   it("should return 401 when Authorization header is missing", async () => {
-    const response = await supertest(app.server).get("/api/profile").expect(401);
+    const response = await supertest(app.server)
+      .get("/api/profile")
+      .expect(401);
     expect(response.body.error).toBe("Unauthorized");
     expect(response.body.message).toMatch(/authorization header/i);
   });
@@ -137,10 +135,12 @@ describe("fastifyVerifyToken middleware", () => {
         extractToken: (request) => {
           return request.headers["x-custom-token"] as string;
         },
-      })
+      }),
     );
 
-    const issued = await manager.generateAccessToken({ sub: "custom-token-user" });
+    const issued = await manager.generateAccessToken({
+      sub: "custom-token-user",
+    });
 
     // we can verify the token with Bearer token
     await supertest(customExtractApp.server)
@@ -164,10 +164,12 @@ describe("fastifyVerifyToken middleware", () => {
         // Fastify style: onVerified should be async function
         onVerified: async (auth, _continueHook, _request, reply) => {
           if (auth.payload.sub === "banned-user") {
-            return reply.status(403).send({ error: "Forbidden", message: "User is banned" });
+            return reply
+              .status(403)
+              .send({ error: "Forbidden", message: "User is banned" });
           }
         },
-      })
+      }),
     );
 
     const issued = await manager.generateAccessToken({ sub: "banned-user" });
@@ -189,7 +191,7 @@ describe("fastifyVerifyToken middleware", () => {
         onVerified: async () => {
           throw new Error("Database disconnected during validation");
         },
-      })
+      }),
     );
 
     const issued = await manager.generateAccessToken({ sub: "user-1" });

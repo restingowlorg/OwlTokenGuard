@@ -3,11 +3,7 @@ import { SecurityConfigurationError } from "../errors/SecurityConfigurationError
 import type { SigningKeyMaterial } from "../config/types";
 import { SecretValidator } from "./SecretValidator";
 
-export type SigningAlgorithm =
-  | "RS256"
-  | "ES256"
-  | "HS256"
-  | "HS512";
+export type SigningAlgorithm = "RS256" | "ES256" | "HS256" | "HS512";
 
 const BLOCKED_ALGORITHMS = ["none", "NONE"] as const;
 
@@ -32,7 +28,9 @@ function isHmacAlgorithm(
  * Story 1.1: blocks `none` and unauthorized hashing types.
  */
 export class AlgorithmGuard {
-  static assertAllowed(algorithm: string): asserts algorithm is SigningAlgorithm {
+  static assertAllowed(
+    algorithm: string,
+  ): asserts algorithm is SigningAlgorithm {
     if ((BLOCKED_ALGORITHMS as readonly string[]).includes(algorithm)) {
       throw new SecurityConfigurationError(
         `Algorithm "${algorithm}" is not permitted`,
@@ -101,15 +99,11 @@ export class AlgorithmGuard {
     }
 
     if (algorithm === "RS256" && key.asymmetricKeyType !== "rsa") {
-      throw new SecurityConfigurationError(
-        "RS256 requires an RSA private key",
-      );
+      throw new SecurityConfigurationError("RS256 requires an RSA private key");
     }
 
     if (algorithm === "ES256" && key.asymmetricKeyType !== "ec") {
-      throw new SecurityConfigurationError(
-        "ES256 requires an EC private key",
-      );
+      throw new SecurityConfigurationError("ES256 requires an EC private key");
     }
   }
 }

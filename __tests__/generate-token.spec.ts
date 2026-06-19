@@ -25,9 +25,10 @@ describe("generate token (usage)", () => {
         },
       });
 
-      const first = await manager.generateAccessToken(
-        { sub: "user-123", role: "admin" },
-      );
+      const first = await manager.generateAccessToken({
+        sub: "user-123",
+        role: "admin",
+      });
 
       expect(first.token).toMatch(
         /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,

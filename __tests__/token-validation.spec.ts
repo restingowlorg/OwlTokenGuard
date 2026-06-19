@@ -27,7 +27,7 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     const result = await validateToken(manager, issued.token, {
-      purpose: "access"
+      purpose: "access",
     });
 
     expect(result.jti).toBe(issued.claims.jti);
@@ -125,8 +125,12 @@ describe("Epic 2: validateToken / verify", () => {
       { x5u: "http://keys.example/cert.pem" },
     );
 
-    await expect(validateToken(manager, httpJku)).rejects.toThrow(/must use https/i);
-    await expect(validateToken(manager, httpX5u)).rejects.toThrow(/must use https/i);
+    await expect(validateToken(manager, httpJku)).rejects.toThrow(
+      /must use https/i,
+    );
+    await expect(validateToken(manager, httpX5u)).rejects.toThrow(
+      /must use https/i,
+    );
   });
 
   it("should reject expired tokens (Story 2.3 exp)", async () => {
@@ -148,7 +152,9 @@ describe("Epic 2: validateToken / verify", () => {
       nbf: now + 3600,
     });
 
-    await expect(validateToken(manager, token)).rejects.toThrow(/not yet valid/i);
+    await expect(validateToken(manager, token)).rejects.toThrow(
+      /not yet valid/i,
+    );
   });
 
   it("should require exp and nbf for access token verification (Story 2.3)", async () => {
@@ -316,8 +322,8 @@ describe("Epic 2: validateToken / verify", () => {
     const token = buildSignedTestJwt(
       { ...baseConfig, trustedIssuers: undefined, audience: undefined },
       {
-      sub: "user-1",
-      jti: "revoked-jti",
+        sub: "user-1",
+        jti: "revoked-jti",
       },
     );
 
@@ -325,7 +331,9 @@ describe("Epic 2: validateToken / verify", () => {
   });
 
   it("should reject tokens issued before getTokensInvalidBefore cutoff", async () => {
-    const invalidBeforeBySub = new Map<string, number>([["user-cutoff", 2_000_000_000]]);
+    const invalidBeforeBySub = new Map<string, number>([
+      ["user-cutoff", 2_000_000_000],
+    ]);
 
     const manager = createTokenManager({
       ...baseConfig,
@@ -345,7 +353,9 @@ describe("Epic 2: validateToken / verify", () => {
       },
     );
 
-    await expect(validateToken(manager, token)).rejects.toThrow(/invalidation cutoff/i);
+    await expect(validateToken(manager, token)).rejects.toThrow(
+      /invalidation cutoff/i,
+    );
   });
 
   it("should reject tokens via isSessionRevoked using iat-aware policy", async () => {
@@ -381,7 +391,10 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     const reauthAt = 2_000_000_000;
-    const issued = await manager.generateAccessToken({ sub: "user-fresh" }, { reauthAt });
+    const issued = await manager.generateAccessToken(
+      { sub: "user-fresh" },
+      { reauthAt },
+    );
 
     const access = await manager.verify(issued.token, { purpose: "access" });
     expect(access.claims.reauth_at).toBe(reauthAt);

@@ -105,10 +105,7 @@ describe("expressVerifyToken middleware", () => {
   });
 
   it("should support validateTokenMiddleware alias", async () => {
-    const aliasApp = createTestApp(
-      "/secure",
-      validateTokenMiddleware(manager),
-    );
+    const aliasApp = createTestApp("/secure", validateTokenMiddleware(manager));
     const issued = await manager.generateAccessToken({ sub: "alias-user" });
 
     const response = await request(aliasApp)
@@ -132,7 +129,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "hook-pass-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "hook-pass-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-pass/profile")
@@ -156,7 +155,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "auto-next-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "auto-next-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-auto-next/profile")
@@ -181,7 +182,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "hook-fail-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "hook-fail-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-fail/profile")

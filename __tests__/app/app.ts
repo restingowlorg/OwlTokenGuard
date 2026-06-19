@@ -26,12 +26,10 @@ export interface ShowcaseApp {
  *   POST /auth/verify         — manually verify any token
  *   POST /auth/terminate      — terminate session by jti (server-side revoke)
  */
-export function createShowcaseApp(
-  dependencies?: {
-    tokenManager?: TokenManager;
-    sessionStore?: SessionStore;
-  },
-): ShowcaseApp {
+export function createShowcaseApp(dependencies?: {
+  tokenManager?: TokenManager;
+  sessionStore?: SessionStore;
+}): ShowcaseApp {
   const sessionStore = dependencies?.sessionStore ?? new SessionStore();
   const tokenManager =
     dependencies?.tokenManager ?? createShowcaseTokenManager(sessionStore);
@@ -209,11 +207,7 @@ export function createShowcaseApp(
   return { app, tokenManager, sessionStore };
 }
 
-function sendTokenError(
-  res: Response,
-  error: unknown,
-  status = 400,
-): Response {
+function sendTokenError(res: Response, error: unknown, status = 400): Response {
   if (
     error instanceof TokenVerificationError ||
     error instanceof TokenGenerationError

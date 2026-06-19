@@ -4,7 +4,10 @@ import { generateKeyPairSync } from "crypto";
 export const TEST_HMAC_SECRET =
   "xK9#mP2$vL8@nQ4&wR7!zT1^yU5*bI0+cO3-dF6_eH9=gJ2~aS7%hD4&kF8#qW1!rE6@tY3";
 
-export function generateRsaKeyPair(): { privateKey: string; publicKey: string } {
+export function generateRsaKeyPair(): {
+  privateKey: string;
+  publicKey: string;
+} {
   const { privateKey, publicKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
   });

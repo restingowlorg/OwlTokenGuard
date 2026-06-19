@@ -1,12 +1,16 @@
-# `@restingowlorg/ossec-cryptography`
+# OwlTokenGuard
+
+[![npm version](https://img.shields.io/npm/v/@restingowlorg/owltokenguard.svg)](https://www.npmjs.com/package/@restingowlorg/owltokenguard)
+[![CI](https://github.com/restingowlorg/OwlTokenGuard/actions/workflows/ci.yml/badge.svg)](https://github.com/restingowlorg/OwlTokenGuard/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/@restingowlorg/owltokenguard.svg)](./LICENSE)
 
 Open-source OWASP-aligned token and session security library for Node.js.
 
-`@restingowlorg/ossec-cryptography` gives your backend a focused authentication-token surface:
+`@restingowlorg/owltokenguard` gives your backend a focused authentication-token surface:
 access token issuance, refresh-token rotation, token verification, middleware integration, session revocation, and freshness controls for account-security events (email / MFA changes).
 
-- **Package:** `@restingowlorg/ossec-cryptography`
-- **Install:** `npm install @restingowlorg/ossec-cryptography`
+- **Package:** `@restingowlorg/owltokenguard`
+- **Install:** `npm install @restingowlorg/owltokenguard`
 - **Runtime:** Node.js 18+
 - **Module output:** CommonJS
 
@@ -27,21 +31,21 @@ access token issuance, refresh-token rotation, token verification, middleware in
 
 ## Support Matrix
 
-| Area | Current Support |
-| --- | --- |
-| Runtime | Node.js 18+ |
-| Language | TypeScript, JavaScript |
-| Module output | CommonJS |
-| Signing algorithms | HS256, HS512, RS256, ES256 |
-| HTTP frameworks | Express, Fastify |
-| Core flows | Issue, Verify, Rotate, Revoke, Terminate |
+| Area               | Current Support                          |
+| ------------------ | ---------------------------------------- |
+| Runtime            | Node.js 18+                              |
+| Language           | TypeScript, JavaScript                   |
+| Module output      | CommonJS                                 |
+| Signing algorithms | HS256, HS512, RS256, ES256               |
+| HTTP frameworks    | Express, Fastify                         |
+| Core flows         | Issue, Verify, Rotate, Revoke, Terminate |
 
 ---
 
 ## Installation
 
 ```bash
-npm install @restingowlorg/ossec-cryptography
+npm install @restingowlorg/owltokenguard
 ```
 
 ---
@@ -49,7 +53,7 @@ npm install @restingowlorg/ossec-cryptography
 ## Quick Start
 
 ```ts
-import { createTokenManager } from "@restingowlorg/ossec-cryptography";
+import { createTokenManager } from "@restingowlorg/owltokenguard";
 
 const tokenManager = createTokenManager({
   algorithm: "HS256",
@@ -139,7 +143,7 @@ import express from "express";
 import {
   createTokenManager,
   expressVerifyToken,
-} from "@restingowlorg/ossec-cryptography";
+} from "@restingowlorg/owltokenguard";
 
 const app = express();
 app.use(express.json());
@@ -169,7 +173,7 @@ import Fastify from "fastify";
 import {
   createTokenManager,
   fastifyVerifyToken,
-} from "@restingowlorg/ossec-cryptography";
+} from "@restingowlorg/owltokenguard";
 
 const app = Fastify();
 
@@ -195,34 +199,34 @@ app.get("/api/me", { preHandler: requireAccessToken }, async (request) => {
 
 ### Core `TokenConfig`
 
-| Option | Type | Purpose |
-| --- | --- | --- |
-| `algorithm` | `SigningAlgorithm` | Select JWT signing algorithm (`HS*`, `RS256`, `ES256`) |
-| `hmacSecret` | `string` | Shared secret for symmetric signing (`HS*`) |
-| `signingKey` | key material | Private/public key material for asymmetric signing |
-| `expiresInSeconds` | `number` | Access token expiration offset |
-| `refreshTokenEnabled` | `boolean` | Enable refresh token issuance |
-| `refreshTokenExpiresInSeconds` | `number` | Refresh token expiration offset |
-| `payloadCipher` | `PayloadCipher` | Optional payload encryption before signing |
-| `onRefreshTokenIssued` | hook | Persist refresh session metadata |
-| `consumeRefreshToken` | hook | One-time refresh-token consumption check |
-| `onSessionTerminate` | hook | Session revocation / cutoff persistence |
-| `isSessionRevoked` | hook | Per-token revocation check at verification |
-| `getTokensInvalidBefore` | hook | Reject tokens with `iat` before user cutoff |
-| `requireReauthAtClaim` | `boolean` | Require `reauth_at` freshness marker |
-| `getMinimumReauthAt` | hook | Reject stale tokens with low `reauth_at` |
+| Option                         | Type               | Purpose                                                |
+| ------------------------------ | ------------------ | ------------------------------------------------------ |
+| `algorithm`                    | `SigningAlgorithm` | Select JWT signing algorithm (`HS*`, `RS256`, `ES256`) |
+| `hmacSecret`                   | `string`           | Shared secret for symmetric signing (`HS*`)            |
+| `signingKey`                   | key material       | Private/public key material for asymmetric signing     |
+| `expiresInSeconds`             | `number`           | Access token expiration offset                         |
+| `refreshTokenEnabled`          | `boolean`          | Enable refresh token issuance                          |
+| `refreshTokenExpiresInSeconds` | `number`           | Refresh token expiration offset                        |
+| `payloadCipher`                | `PayloadCipher`    | Optional payload encryption before signing             |
+| `onRefreshTokenIssued`         | hook               | Persist refresh session metadata                       |
+| `consumeRefreshToken`          | hook               | One-time refresh-token consumption check               |
+| `onSessionTerminate`           | hook               | Session revocation / cutoff persistence                |
+| `isSessionRevoked`             | hook               | Per-token revocation check at verification             |
+| `getTokensInvalidBefore`       | hook               | Reject tokens with `iat` before user cutoff            |
+| `requireReauthAtClaim`         | `boolean`          | Require `reauth_at` freshness marker                   |
+| `getMinimumReauthAt`           | hook               | Reject stale tokens with low `reauth_at`               |
 
 ### Verification Options (`verify`)
 
-| Option | Type | Purpose |
-| --- | --- | --- |
-| `purpose` | `"access" \| "id" \| "refresh"` | Enforce token intent |
-| `audience` | `string \| string[]` | Override audience check |
-| `trustedIssuers` | `string[]` | Override issuer allowlist |
-| `clockToleranceSeconds` | `number` | Temporal tolerance |
-| `requireTemporalClaims` | `boolean` | Require `exp` and `nbf` |
-| `requireReauthAtClaim` | `boolean` | Require `reauth_at` for this call |
-| `minimumReauthAt` | `number` | Per-request reauth freshness cutoff |
+| Option                  | Type                            | Purpose                             |
+| ----------------------- | ------------------------------- | ----------------------------------- |
+| `purpose`               | `"access" \| "id" \| "refresh"` | Enforce token intent                |
+| `audience`              | `string \| string[]`            | Override audience check             |
+| `trustedIssuers`        | `string[]`                      | Override issuer allowlist           |
+| `clockToleranceSeconds` | `number`                        | Temporal tolerance                  |
+| `requireTemporalClaims` | `boolean`                       | Require `exp` and `nbf`             |
+| `requireReauthAtClaim`  | `boolean`                       | Require `reauth_at` for this call   |
+| `minimumReauthAt`       | `number`                        | Per-request reauth freshness cutoff |
 
 ---
 
@@ -331,13 +335,55 @@ You still need to implement:
 ## Development
 
 ```bash
-npm run test
+npm install
+npm run format        # Prettier write
+npm run format:check  # Prettier check (CI gate)
 npm run typecheck
 npm run build
+npm run test
+npm run release:validate   # all gates in one command
 ```
+
+Git hooks (Husky) enforce commit messages (Conventional Commits), secret
+scanning, formatting, type safety, and push-time validation. See
+[`docs/DEVELOPER_GUIDE.md`](./docs/DEVELOPER_GUIDE.md).
+
+---
+
+## Deployment & Releases
+
+Releases use [Changesets](https://github.com/changesets/changesets) with a
+three-branch model and npm trusted publishing (OIDC).
+
+| Branch    | Role                  | npm dist-tag |
+| --------- | --------------------- | ------------ |
+| `develop` | Integration           | -            |
+| `staging` | Prerelease validation | `next`       |
+| `main`    | Stable releases       | `latest`     |
+
+Record a user-facing change:
+
+```bash
+npm run changeset
+```
+
+Then follow the release flow:
+
+- Quick checklist: [`docs/RELEASE_DAY_RUNBOOK.md`](./docs/RELEASE_DAY_RUNBOOK.md)
+- Full process: [`docs/DETAILED_RELEASE_SYNC_RUNBOOK.md`](./docs/DETAILED_RELEASE_SYNC_RUNBOOK.md)
+
+Automation:
+
+- `CI` — format check, type check, build, tests on every PR
+- `Security` — secret scan + dependency audit
+- `CodeQL` — static analysis
+- `Release` — prerelease (`next`) from `staging`, stable (`latest`) from `main`
+
+Publishing uses npm trusted publishing, so no `NPM_TOKEN` / `NODE_AUTH_TOKEN`
+secrets are required. The publish step needs Node 22.14.0+.
 
 ---
 
 ## License
 
-MIT
+MIT © Resting Owl

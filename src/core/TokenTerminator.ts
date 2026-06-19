@@ -74,7 +74,9 @@ export class TokenTerminator {
 
     const verified = await this.verifier.verify(token, verifyOptions);
     const sub =
-      typeof verified.payload.sub === "string" ? verified.payload.sub : undefined;
+      typeof verified.payload.sub === "string"
+        ? verified.payload.sub
+        : undefined;
 
     await this.terminate(verified.claims, {
       sub,

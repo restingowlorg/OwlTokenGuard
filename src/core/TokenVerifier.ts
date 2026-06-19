@@ -1,5 +1,9 @@
 import type { TokenConfig } from "../config/types";
-import type { VerifyOptions, VerifyResult, TokenPurpose } from "../validation/types";
+import type {
+  VerifyOptions,
+  VerifyResult,
+  TokenPurpose,
+} from "../validation/types";
 import { REAUTH_AT_CLAIM } from "./types";
 import { verifyJwtSignatureFirst } from "../jwt/JwtVerifier";
 import { TokenVerificationError } from "../errors/TokenVerificationError";
@@ -11,7 +15,9 @@ function nowSeconds(): number {
 
 type DeclaredTokenType = TokenPurpose | "refresh";
 
-function normalizeDeclaredTokenType(value: string): DeclaredTokenType | undefined {
+function normalizeDeclaredTokenType(
+  value: string,
+): DeclaredTokenType | undefined {
   if (value === "access" || value === "at+jwt") {
     return "access";
   }
@@ -30,7 +36,10 @@ function normalizeDeclaredTokenType(value: string): DeclaredTokenType | undefine
 export class TokenVerifier {
   constructor(private readonly config: TokenConfig) {}
 
-  async verify(token: string, options: VerifyOptions = {}): Promise<VerifyResult> {
+  async verify(
+    token: string,
+    options: VerifyOptions = {},
+  ): Promise<VerifyResult> {
     const { header, payload: rawPayload } = verifyJwtSignatureFirst(
       token,
       this.config,
@@ -127,9 +136,7 @@ export class TokenVerifier {
       this.config.requireTemporalClaims ??
       (options.purpose === "access" || options.purpose === "refresh");
     const tolerance =
-      options.clockToleranceSeconds ??
-      this.config.clockToleranceSeconds ??
-      0;
+      options.clockToleranceSeconds ?? this.config.clockToleranceSeconds ?? 0;
     const now = nowSeconds();
 
     const nbf = payload.nbf;
@@ -157,8 +164,7 @@ export class TokenVerifier {
     payload: Record<string, unknown>,
     options: VerifyOptions,
   ): void {
-    const trusted =
-      options.trustedIssuers ?? this.config.trustedIssuers ?? [];
+    const trusted = options.trustedIssuers ?? this.config.trustedIssuers ?? [];
     if (trusted.length === 0) return;
 
     const iss = payload.iss;

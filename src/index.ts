@@ -12,7 +12,6 @@ export {
   validateTokenPreHandler,
 } from "./middlewares/fastify";
 
-
 // Types
 export * from "./core/types";
 export * from "./config/types";

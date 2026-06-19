@@ -40,8 +40,7 @@ export class TokenManager {
   ) {
     this.verifier = dependencies?.verifier ?? new TokenVerifier(config);
     this.terminator =
-      dependencies?.terminator ??
-      new TokenTerminator(config, this.verifier);
+      dependencies?.terminator ?? new TokenTerminator(config, this.verifier);
     this.issuer =
       dependencies?.issuer ??
       new TokenIssuer(config, { terminator: this.terminator });

@@ -65,7 +65,10 @@ describe("TokenManager.generateAccessToken", () => {
       refreshTokenExpiresInSeconds: 3600,
     });
 
-    const result = await manager.generateAccessToken({ sub: "user-3", role: "admin" });
+    const result = await manager.generateAccessToken({
+      sub: "user-3",
+      role: "admin",
+    });
     const claims = decodeUnsafeJwtPayload(result.token);
     const refreshClaims = decodeUnsafeJwtPayload(result.refreshToken!);
 
@@ -98,7 +101,10 @@ describe("TokenManager.generateAccessToken", () => {
         saved.push({
           refreshJti: context.refreshClaims.jti,
           accessJti: context.accessClaims.jti,
-          sub: typeof context.payload.sub === "string" ? context.payload.sub : undefined,
+          sub:
+            typeof context.payload.sub === "string"
+              ? context.payload.sub
+              : undefined,
           expiresAt: context.expiresAt,
         });
       },
@@ -125,9 +131,9 @@ describe("TokenManager.generateAccessToken", () => {
       },
     });
 
-    await expect(manager.generateAccessToken({ sub: "user-fail" })).rejects.toThrow(
-      /Refresh token persistence failed/i,
-    );
+    await expect(
+      manager.generateAccessToken({ sub: "user-fail" }),
+    ).rejects.toThrow(/Refresh token persistence failed/i);
   });
 
   it("should invoke onRefreshTokenIssued from generate compatibility wrapper", async () => {
@@ -180,7 +186,9 @@ describe("TokenManager.generateReferenceToken", () => {
       expiresInSeconds: 3600,
     });
 
-    const result = manager.generateReferenceToken({ referenceEncoding: "base64url" });
+    const result = manager.generateReferenceToken({
+      referenceEncoding: "base64url",
+    });
 
     expect(result.referenceToken.length).toBeGreaterThan(0);
     expect(result.encoding).toBe("base64url");

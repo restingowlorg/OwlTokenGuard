@@ -66,8 +66,7 @@ export interface ReferenceIssuanceOptions {
 
 /** Options for combined JWT + reference issuance (`generate`). */
 export interface GenerateOptions
-  extends AccessTokenOptions,
-    ReferenceIssuanceOptions {}
+  extends AccessTokenOptions, ReferenceIssuanceOptions {}
 
 /** Signed JWT access token with standard claims. */
 export interface AccessTokenResult {

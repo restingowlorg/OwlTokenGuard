@@ -147,6 +147,8 @@ describe("TokenManager.rotate", () => {
     const login = await manager.generateAccessToken({ sub: "user-6" });
     revoked.add(login.refreshClaims!.jti);
 
-    await expect(manager.rotate(login.refreshToken!)).rejects.toThrow(/revoked/i);
+    await expect(manager.rotate(login.refreshToken!)).rejects.toThrow(
+      /revoked/i,
+    );
   });
 });

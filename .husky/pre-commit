@@ -55,13 +55,11 @@ resolve_npm() {
   return 1
 }
 
-# Start timing
 START_TIME=$(date +%s)
 
 info "Running pre-commit checks..."
 echo ""
 
-# Check for skip flag
 if [ "${SKIP_HOOKS:-false}" = "true" ]; then
   warn "Skipping pre-commit hook (SKIP_HOOKS=true)"
   exit 0
@@ -116,17 +114,12 @@ if [ -f "package-lock.json" ]; then
 fi
 
 echo ""
-info "Step 4: Fixing linting issues..."
-"$NPM_CMD" exec --no -- eslint --fix --ext .ts,.js src/ 2>/dev/null || true
-success "Linting complete"
-
-echo ""
-info "Step 5: Formatting code..."
+info "Step 4: Formatting staged files..."
 "$NPM_CMD" exec --no -- lint-staged
 success "Code formatted"
 
 echo ""
-info "Step 6: Type checking (incremental)..."
+info "Step 5: Type checking (incremental)..."
 if "$NPM_CMD" exec --no -- tsc --noEmit --incremental; then
   success "Type check passed"
 else
@@ -134,7 +127,6 @@ else
   exit 1
 fi
 
-# Calculate duration
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 

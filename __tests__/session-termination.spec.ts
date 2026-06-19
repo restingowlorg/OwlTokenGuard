@@ -3,7 +3,9 @@ import { TokenGenerationError } from "../src/errors/TokenGenerationError";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
 
 describe("session termination", () => {
-  const createManager = (onSessionTerminate?: (jti: string) => Promise<void>) => {
+  const createManager = (
+    onSessionTerminate?: (jti: string) => Promise<void>,
+  ) => {
     const terminated: string[] = [];
     const manager = createTokenManager({
       expiresInSeconds: 3600,

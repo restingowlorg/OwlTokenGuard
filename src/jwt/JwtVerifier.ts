@@ -25,7 +25,10 @@ export type ResolvedVerificationMaterial =
       algorithm: "RS256" | "ES256";
     };
 
-function decodeJsonSegment(segment: string, label: string): Record<string, unknown> {
+function decodeJsonSegment(
+  segment: string,
+  label: string,
+): Record<string, unknown> {
   try {
     const json = Buffer.from(segment, "base64url").toString("utf8");
     const value = JSON.parse(json) as unknown;
@@ -181,10 +184,14 @@ export function resolveVerificationMaterial(
 
   const publicKey = createPublicKey(publicKeyPem);
   if (algorithm === "RS256" && publicKey.asymmetricKeyType !== "rsa") {
-    throw new TokenVerificationError("RS256 verification requires an RSA public key");
+    throw new TokenVerificationError(
+      "RS256 verification requires an RSA public key",
+    );
   }
   if (algorithm === "ES256" && publicKey.asymmetricKeyType !== "ec") {
-    throw new TokenVerificationError("ES256 verification requires an EC public key");
+    throw new TokenVerificationError(
+      "ES256 verification requires an EC public key",
+    );
   }
 
   return {
