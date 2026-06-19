@@ -65,7 +65,11 @@ describe("expressVerifyToken middleware", () => {
 
   it("should return 401 when token signature is tampered", async () => {
     const issued = await manager.generateAccessToken({ sub: "user-1" });
-    const tampered = `${issued.token.slice(0, -1)}x`;
+    const [header, payload, signature] = issued.token.split(".");
+    // Flip the first signature character (carries 6 significant bits, so the
+    // decoded signature bytes always change) to deterministically tamper it.
+    const flipped = signature[0] === "A" ? "B" : "A";
+    const tampered = `${header}.${payload}.${flipped}${signature.slice(1)}`;
 
     const response = await request(app)
       .get("/api/profile")

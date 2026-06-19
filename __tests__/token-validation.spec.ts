@@ -38,7 +38,11 @@ describe("Epic 2: validateToken / verify", () => {
   it("should reject tampered signatures (Story 2.1 signature-first)", async () => {
     const manager = createTokenManager(baseConfig);
     const issued = await manager.generateAccessToken({ sub: "user-1" });
-    const tampered = `${issued.token.slice(0, -1)}x`;
+    const [header, payload, signature] = issued.token.split(".");
+    // Flip the first signature character (carries 6 significant bits, so the
+    // decoded signature bytes always change) to deterministically tamper it.
+    const flipped = signature[0] === "A" ? "B" : "A";
+    const tampered = `${header}.${payload}.${flipped}${signature.slice(1)}`;
 
     await expect(validateToken(manager, tampered)).rejects.toThrow(
       TokenVerificationError,

@@ -129,6 +129,8 @@ describe("TokenManager.generateAccessToken", () => {
       onRefreshTokenIssued: async () => {
         throw new Error("database unavailable");
       },
+      // Expected failure path: silence the logged error to keep test output clean.
+      customLogger: { debug: () => {}, error: () => {} },
     });
 
     await expect(
