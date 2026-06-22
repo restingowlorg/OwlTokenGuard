@@ -7,8 +7,10 @@ import {
 } from "../src/middlewares/fastify";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
 import { buildSignedTestJwt } from "./helpers/jwt";
+import { requiredTestHooks } from "./helpers/config";
 
 const managerConfig = {
+  ...requiredTestHooks,
   algorithm: "HS256" as const,
   hmacSecret: TEST_HMAC_SECRET,
   expiresInSeconds: 3600,

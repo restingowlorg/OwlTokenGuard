@@ -1,6 +1,7 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
+import { noopOnSessionTerminate, requiredTestHooks } from "./helpers/config";
 
 /**
  * Integration-style tests mirroring documented usage:
@@ -70,6 +71,7 @@ describe("generate token (usage)", () => {
       const { privateKey } = generateRsaKeyPair();
 
       const manager = createTokenManager({
+        ...requiredTestHooks,
         algorithm: "RS256",
         signingKey: { type: "asymmetric", privateKey },
         expiresInSeconds: 3600,
@@ -96,6 +98,7 @@ describe("generate token (usage)", () => {
     it("should issue a new access and refresh token on every generateAccessToken call", async () => {
       const DummyCacheOrDatabase: string[] = [];
       const manager = createTokenManager({
+        ...requiredTestHooks,
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
         expiresInSeconds: 3600,
@@ -126,6 +129,7 @@ describe("generate token (usage)", () => {
 
     it("should issue both tokens via generate compatibility wrapper", async () => {
       const manager = createTokenManager({
+        ...requiredTestHooks,
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
         expiresInSeconds: 3600,
@@ -142,6 +146,7 @@ describe("generate token (usage)", () => {
   describe("refresh tokens", () => {
     it("should return access and refresh tokens from generate when enabled", async () => {
       const manager = createTokenManager({
+        ...requiredTestHooks,
         algorithm: "HS256",
         hmacSecret: TEST_HMAC_SECRET,
         expiresInSeconds: 3600,

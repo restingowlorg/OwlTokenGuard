@@ -2,10 +2,12 @@ import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { Aes256GcmCipher } from "../src/ciphering/Aes256GcmCipher";
 import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
+import { requiredTestHooks } from "./helpers/config";
 
 describe("TokenManager.generateAccessToken", () => {
   it("should issue an HS256 JWT with standard claims and no reference token", async () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -24,6 +26,7 @@ describe("TokenManager.generateAccessToken", () => {
   it("should issue an RS256 JWT with asymmetric keys", async () => {
     const { privateKey } = generateRsaKeyPair();
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "RS256",
       signingKey: { type: "asymmetric", privateKey },
       expiresInSeconds: 3600,
@@ -57,6 +60,7 @@ describe("TokenManager.generateAccessToken", () => {
   it("should encrypt payload with AES-256-GCM when cipher is configured", async () => {
     const encryptionKey = Buffer.alloc(32, 7);
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -92,6 +96,7 @@ describe("TokenManager.generateAccessToken", () => {
     }> = [];
 
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -121,6 +126,7 @@ describe("TokenManager.generateAccessToken", () => {
 
   it("should fail issuance when onRefreshTokenIssued throws", async () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -141,6 +147,7 @@ describe("TokenManager.generateAccessToken", () => {
   it("should invoke onRefreshTokenIssued from generate compatibility wrapper", async () => {
     const saved: string[] = [];
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -159,6 +166,7 @@ describe("TokenManager.generateAccessToken", () => {
 
   it("should issue access and refresh tokens when refresh tokens are enabled", async () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -183,6 +191,7 @@ describe("TokenManager.generateAccessToken", () => {
 describe("TokenManager.generateReferenceToken", () => {
   it("should issue an opaque reference token without a JWT", () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
@@ -202,6 +211,7 @@ describe("TokenManager.generateReferenceToken", () => {
 describe("TokenManager.generate (compatibility wrapper)", () => {
   it("should issue both access JWT and reference token", async () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,

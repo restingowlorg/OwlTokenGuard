@@ -1,10 +1,12 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { TokenManager } from "../src/core/TokenManager";
 import { defaults } from "../src/config/defaults";
+import { requiredTestHooks } from "./helpers/config";
 
 describe("createTokenManager", () => {
   it("should return a TokenManager instance", () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       expiresInSeconds: 3600,
     });
     expect(manager).toBeInstanceOf(TokenManager);
@@ -13,6 +15,7 @@ describe("createTokenManager", () => {
   it("should validate config before returning an instance", () => {
     expect(() =>
       createTokenManager({
+        ...requiredTestHooks,
         algorithm: "none" as never,
         expiresInSeconds: 3600,
       }),
@@ -21,6 +24,7 @@ describe("createTokenManager", () => {
 
   it("should accept config and expose it on the instance", () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       expiresInSeconds: 3600,
     });
     expect(manager.config.expiresInSeconds).toBe(3600);
@@ -31,4 +35,30 @@ describe("createTokenManager", () => {
     expect(defaults.opaqueEntropyBits).toBe(128);
     expect(defaults.minHmacSecretLength).toBe(64);
   });
+
+  it.each([0, -1, NaN, Infinity, 1.5])(
+    "should reject invalid expiresInSeconds at startup (%p)",
+    (expiresInSeconds) => {
+      expect(() =>
+        createTokenManager({
+          ...requiredTestHooks,
+          expiresInSeconds,
+        }),
+      ).toThrow(/expiresInSeconds must be a positive integer/i);
+    },
+  );
+
+  it.each([0, -3600])(
+    "should reject invalid refreshTokenExpiresInSeconds when refresh is enabled (%p)",
+    (refreshTokenExpiresInSeconds) => {
+      expect(() =>
+        createTokenManager({
+          ...requiredTestHooks,
+          expiresInSeconds: 3600,
+          refreshTokenEnabled: true,
+          refreshTokenExpiresInSeconds,
+        }),
+      ).toThrow(/refreshTokenExpiresInSeconds must be a positive integer/i);
+    },
+  );
 });

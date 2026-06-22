@@ -63,14 +63,9 @@ export class TokenTerminator {
    * Verify a JWT and revoke its session — use from `POST /auth/logout`.
    * Pass a refresh token with `{ purpose: "refresh" }` when ending a refresh session.
    */
-  async revokeToken(
-    token: string,
-    options: RevokeTokenOptions = {},
-  ): Promise<void> {
+  async revokeToken(token: string, options: RevokeTokenOptions): Promise<void> {
     const verifyOptions: VerifyOptions = {};
-    if (options.purpose !== undefined) {
-      verifyOptions.purpose = options.purpose;
-    }
+    verifyOptions.purpose = options.purpose;
 
     const verified = await this.verifier.verify(token, verifyOptions);
     const sub =

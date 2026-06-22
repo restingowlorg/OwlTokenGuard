@@ -7,6 +7,8 @@ import { defaults } from "./defaults";
 
 /** Story 1.1: fail-fast config validation at startup. */
 export function validateConfig(config: TokenConfig): void {
+  validatePositiveIntegerSeconds(config.expiresInSeconds, "expiresInSeconds");
+
   const algorithm = config.algorithm ?? defaults.algorithm;
   AlgorithmGuard.assertAllowed(algorithm);
 
@@ -18,12 +20,31 @@ export function validateConfig(config: TokenConfig): void {
     validateAlgorithm(algorithm, config.signingKey);
   }
 
+  if (config.refreshTokenEnabled) {
+    if (config.refreshTokenExpiresInSeconds === undefined) {
+      throw new SecurityConfigurationError(
+        "refreshTokenExpiresInSeconds is required when refreshTokenEnabled is true",
+      );
+    }
+    validatePositiveIntegerSeconds(
+      config.refreshTokenExpiresInSeconds,
+      "refreshTokenExpiresInSeconds",
+    );
+  }
+}
+
+function validatePositiveIntegerSeconds(
+  value: unknown,
+  fieldName: string,
+): void {
   if (
-    config.refreshTokenEnabled &&
-    config.refreshTokenExpiresInSeconds === undefined
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value <= 0
   ) {
     throw new SecurityConfigurationError(
-      "refreshTokenExpiresInSeconds is required when refreshTokenEnabled is true",
+      `${fieldName} must be a positive integer number of seconds`,
     );
   }
 }

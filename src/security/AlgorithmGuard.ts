@@ -18,6 +18,9 @@ const HMAC_ALGORITHMS: readonly SigningAlgorithm[] = ["HS256", "HS512"];
 
 const ASYMMETRIC_ALGORITHMS: readonly SigningAlgorithm[] = ["RS256", "ES256"];
 
+/** ES256 (JWS) is defined only for the P-256 / prime256v1 curve. */
+export const ES256_NAMED_CURVE = "prime256v1";
+
 function isHmacAlgorithm(
   algorithm: SigningAlgorithm,
 ): algorithm is "HS256" | "HS512" {
@@ -102,8 +105,18 @@ export class AlgorithmGuard {
       throw new SecurityConfigurationError("RS256 requires an RSA private key");
     }
 
-    if (algorithm === "ES256" && key.asymmetricKeyType !== "ec") {
-      throw new SecurityConfigurationError("ES256 requires an EC private key");
+    if (algorithm === "ES256") {
+      if (key.asymmetricKeyType !== "ec") {
+        throw new SecurityConfigurationError(
+          "ES256 requires an EC private key",
+        );
+      }
+      const namedCurve = key.asymmetricKeyDetails?.namedCurve;
+      if (namedCurve !== ES256_NAMED_CURVE) {
+        throw new SecurityConfigurationError(
+          `ES256 requires the ${ES256_NAMED_CURVE} curve (P-256)`,
+        );
+      }
     }
   }
 }

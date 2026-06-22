@@ -118,10 +118,19 @@ export class TokenVerifier {
           "Encrypted payload present but no payloadCipher configured",
         );
       }
-      const decrypted = await this.config.payloadCipher.decrypt(
-        payload.enc as EncryptedPayload,
-      );
-      const parsed = JSON.parse(decrypted) as Record<string, unknown>;
+      let parsed: Record<string, unknown>;
+      try {
+        const decrypted = await this.config.payloadCipher.decrypt(
+          payload.enc as EncryptedPayload,
+        );
+        parsed = JSON.parse(decrypted) as Record<string, unknown>;
+      } catch {
+        // Tampered or malformed encrypted payloads can throw raw crypto or
+        // JSON errors; fail shut with a uniform verification error instead.
+        throw new TokenVerificationError(
+          "Encrypted payload could not be decrypted",
+        );
+      }
       return { ...parsed, ...this.extractStandardClaims(payload) };
     }
     return payload;

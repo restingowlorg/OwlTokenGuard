@@ -2,11 +2,13 @@ import type { TokenConfig } from "../src/config/types";
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
+import { requiredTestHooks } from "./helpers/config";
 
 const activeRefreshJtis = new Set<string>();
 const consumedRefreshJtis = new Set<string>();
 
 const tokenManager = createTokenManager({
+  ...requiredTestHooks,
   algorithm: "HS256",
   hmacSecret: TEST_HMAC_SECRET,
   expiresInSeconds: 900,
@@ -27,6 +29,7 @@ function createRefreshManager(overrides: Partial<TokenConfig> = {}) {
   const { consumeRefreshToken, onRefreshTokenIssued, ...rest } = overrides;
 
   return createTokenManager({
+    ...requiredTestHooks,
     algorithm: "HS256",
     hmacSecret: TEST_HMAC_SECRET,
     expiresInSeconds: 900,
@@ -128,6 +131,7 @@ describe("TokenManager.rotate", () => {
 
   it("should reject rotation when refresh tokens are disabled", async () => {
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 900,

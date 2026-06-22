@@ -17,9 +17,37 @@ export function generateRsaKeyPair(): {
   };
 }
 
+/** Intentionally weak 1024-bit RSA key pair for negative security tests. */
+export function generateWeakRsaKeyPair(): {
+  privateKey: string;
+  publicKey: string;
+} {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+    modulusLength: 1024,
+  });
+  return {
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+  };
+}
+
 export function generateEcKeyPair(): { privateKey: string; publicKey: string } {
   const { privateKey, publicKey } = generateKeyPairSync("ec", {
     namedCurve: "P-256",
+  });
+  return {
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
+    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+  };
+}
+
+/** Intentionally non-P-256 EC key pair for negative ES256 security tests. */
+export function generateNonP256EcKeyPair(): {
+  privateKey: string;
+  publicKey: string;
+} {
+  const { privateKey, publicKey } = generateKeyPairSync("ec", {
+    namedCurve: "P-384",
   });
   return {
     privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,

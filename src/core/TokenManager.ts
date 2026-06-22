@@ -113,10 +113,7 @@ export class TokenManager {
   /**
    * Verify a JWT and revoke its session — use from `POST /auth/logout`.
    */
-  async revokeToken(
-    token: string,
-    options?: RevokeTokenOptions,
-  ): Promise<void> {
+  async revokeToken(token: string, options: RevokeTokenOptions): Promise<void> {
     return this.terminator.revokeToken(token, options);
   }
 

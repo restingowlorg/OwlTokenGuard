@@ -1,6 +1,7 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { TokenGenerationError } from "../src/errors/TokenGenerationError";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
+import { noopOnSessionTerminate } from "./helpers/config";
 
 describe("session termination", () => {
   const createManager = (
@@ -71,11 +72,12 @@ describe("session termination", () => {
     ).rejects.toThrow(TokenGenerationError);
   });
 
-  it("should no-op when onSessionTerminate is not configured", async () => {
+  it("should resolve when onSessionTerminate is a no-op", async () => {
     const manager = createTokenManager({
       expiresInSeconds: 3600,
       algorithm: "HS256",
       hmacSecret: TEST_HMAC_SECRET,
+      onSessionTerminate: noopOnSessionTerminate,
     });
     const first = await manager.generate({ sub: "user-789" });
 
