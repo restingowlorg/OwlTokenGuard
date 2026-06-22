@@ -55,13 +55,11 @@ resolve_npm() {
   return 1
 }
 
-# Start timing
 START_TIME=$(date +%s)
 
 info "Running pre-push checks..."
 echo ""
 
-# Check for skip flag
 if [ "${SKIP_HOOKS:-false}" = "true" ]; then
   warn "Skipping pre-push hook (SKIP_HOOKS=true)"
   exit 0
@@ -74,14 +72,12 @@ fi
 
 export PATH="$PWD/node_modules/.bin:$PATH"
 
-# Detect CI environment (GitHub Actions)
 if [ -n "${CI:-}" ] || [ -n "${GITHUB_ACTIONS:-}" ]; then
   IS_CI=true
 else
   IS_CI=false
 fi
 
-# Check for protected branches
 protected_branches="main develop staging"
 current_branch=$(git symbolic-ref --short HEAD 2>/dev/null || echo "")
 
@@ -105,14 +101,11 @@ else
   done
 fi
 
-# Parallel execution of independent checks
 info "Running parallel checks (typecheck + build)..."
 
-# Run typecheck and build in parallel
 "$NPM_CMD" run typecheck > /tmp/typecheck.log 2>&1 & PID_TYPECHECK=$!
 "$NPM_CMD" run build > /tmp/build.log 2>&1 & PID_BUILD=$!
 
-# Wait for both and check results
 TYPECHECK_FAILED=0
 BUILD_FAILED=0
 
@@ -133,7 +126,6 @@ if [ $BUILD_FAILED -eq 1 ]; then
 fi
 success "Build passed"
 
-# Run tests if configured
 echo ""
 TEST_SCRIPT=$(node -e 'try{const p=require("./package.json");process.stdout.write((p.scripts&&p.scripts.test)||"")}catch(e){process.stdout.write("")}')
 DEFAULT_TEST_SCRIPT='echo "Error: no test specified" && exit 1'
@@ -141,7 +133,7 @@ DEFAULT_TEST_SCRIPT='echo "Error: no test specified" && exit 1'
 if [ -z "$TEST_SCRIPT" ] || [ "$TEST_SCRIPT" = "$DEFAULT_TEST_SCRIPT" ]; then
   warn "Tests not configured (skipping)"
 else
-  if [ "$IS_CI" = "false" ] && [ -f "jest.config.cjs" ]; then
+  if [ "$IS_CI" = "false" ] && [ -f "jest.config.js" ]; then
     UPSTREAM_REF=$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true)
     BASE_REF=""
     if [ -n "$UPSTREAM_REF" ]; then
@@ -183,16 +175,15 @@ else
   fi
 fi
 
-# Security audit
 echo ""
 info "Running security audit..."
 if [ -n "${NPM_CMD:-}" ]; then
   AUDIT_OUTPUT=$("$NPM_CMD" audit --omit=dev --json 2>/dev/null || echo '{}')
-  
+
   if [ "$AUDIT_OUTPUT" != "{}" ]; then
     CRITICAL=$(echo "$AUDIT_OUTPUT" | grep -o '"critical":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
     HIGH=$(echo "$AUDIT_OUTPUT" | grep -o '"high":[0-9]*' | head -1 | grep -o '[0-9]*' || echo "0")
-    
+
     if [ "${CRITICAL:-0}" -gt 0 ]; then
       error "Critical vulnerabilities found: ${CRITICAL}"
       if [ "$IS_CI" = "true" ]; then
@@ -209,7 +200,6 @@ if [ -n "${NPM_CMD:-}" ]; then
   fi
 fi
 
-# Calculate duration
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
 

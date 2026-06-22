@@ -40,8 +40,7 @@ export class TokenManager {
   ) {
     this.verifier = dependencies?.verifier ?? new TokenVerifier(config);
     this.terminator =
-      dependencies?.terminator ??
-      new TokenTerminator(config, this.verifier);
+      dependencies?.terminator ?? new TokenTerminator(config, this.verifier);
     this.issuer =
       dependencies?.issuer ??
       new TokenIssuer(config, { terminator: this.terminator });
@@ -114,10 +113,7 @@ export class TokenManager {
   /**
    * Verify a JWT and revoke its session — use from `POST /auth/logout`.
    */
-  async revokeToken(
-    token: string,
-    options?: RevokeTokenOptions,
-  ): Promise<void> {
+  async revokeToken(token: string, options: RevokeTokenOptions): Promise<void> {
     return this.terminator.revokeToken(token, options);
   }
 

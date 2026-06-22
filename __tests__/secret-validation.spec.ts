@@ -16,6 +16,8 @@ describe("SecretValidator", () => {
   });
 
   it("should accept high-entropy secrets of at least 64 characters", () => {
-    expect(() => SecretValidator.validateHmacSecret(TEST_HMAC_SECRET)).not.toThrow();
+    expect(() =>
+      SecretValidator.validateHmacSecret(TEST_HMAC_SECRET),
+    ).not.toThrow();
   });
 });

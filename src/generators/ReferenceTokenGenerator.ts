@@ -1,9 +1,6 @@
 import { randomBytes } from "crypto";
 import { SecurityConfigurationError } from "../errors/SecurityConfigurationError";
-import type {
-  ReferenceTokenOptions,
-  ReferenceTokenResult,
-} from "./types";
+import type { ReferenceTokenOptions, ReferenceTokenResult } from "./types";
 
 const MIN_ENTROPY_BITS = 128;
 

@@ -1,9 +1,4 @@
-import {
-  createHmac,
-  createPrivateKey,
-  sign,
-  type KeyObject,
-} from "crypto";
+import { createHmac, createPrivateKey, sign, type KeyObject } from "crypto";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import type { SigningAlgorithm } from "../security/AlgorithmGuard";
 
@@ -32,11 +27,13 @@ export function signJwt(
   let signature: Buffer;
   if (material.kind === "hmac") {
     const hash = material.algorithm === "HS512" ? "sha512" : "sha256";
-    signature = createHmac(hash, material.secret)
-      .update(signingInput)
-      .digest();
+    signature = createHmac(hash, material.secret).update(signingInput).digest();
   } else if (material.algorithm === "RS256") {
-    signature = sign("RSA-SHA256", Buffer.from(signingInput), material.privateKey);
+    signature = sign(
+      "RSA-SHA256",
+      Buffer.from(signingInput),
+      material.privateKey,
+    );
   } else {
     signature = sign("sha256", Buffer.from(signingInput), {
       key: material.privateKey,
@@ -60,7 +57,11 @@ export function decodeUnsafeJwtPayload(token: string): Record<string, unknown> {
   try {
     const json = Buffer.from(parts[1], "base64url").toString("utf8");
     const payload = JSON.parse(json) as unknown;
-    if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    if (
+      payload === null ||
+      typeof payload !== "object" ||
+      Array.isArray(payload)
+    ) {
       throw new TokenGenerationError("JWT payload must be a JSON object");
     }
     return payload as Record<string, unknown>;

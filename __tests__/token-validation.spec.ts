@@ -2,10 +2,18 @@ import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { validateToken } from "../src/validation/validateToken";
 import { TokenVerificationError } from "../src/errors/TokenVerificationError";
 import { UntrustedKeySourceError } from "../src/errors/UntrustedKeySourceError";
-import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
+import {
+  TEST_HMAC_SECRET,
+  generateEcKeyPair,
+  generateNonP256EcKeyPair,
+  generateRsaKeyPair,
+  generateWeakRsaKeyPair,
+} from "./helpers/keys";
 import { buildSignedTestJwt, buildUnsignedJwt } from "./helpers/jwt";
+import { requiredTestHooks } from "./helpers/config";
 
 const baseConfig = {
+  ...requiredTestHooks,
   algorithm: "HS256" as const,
   hmacSecret: TEST_HMAC_SECRET,
   expiresInSeconds: 3600,
@@ -27,7 +35,7 @@ describe("Epic 2: validateToken / verify", () => {
     });
 
     const result = await validateToken(manager, issued.token, {
-      purpose: "access"
+      purpose: "access",
     });
 
     expect(result.jti).toBe(issued.claims.jti);
@@ -38,10 +46,39 @@ describe("Epic 2: validateToken / verify", () => {
   it("should reject tampered signatures (Story 2.1 signature-first)", async () => {
     const manager = createTokenManager(baseConfig);
     const issued = await manager.generateAccessToken({ sub: "user-1" });
-    const tampered = `${issued.token.slice(0, -1)}x`;
+    const [header, payload, signature] = issued.token.split(".");
+    // Flip the first signature character (carries 6 significant bits, so the
+    // decoded signature bytes always change) to deterministically tamper it.
+    const flipped = signature[0] === "A" ? "B" : "A";
+    const tampered = `${header}.${payload}.${flipped}${signature.slice(1)}`;
 
     await expect(validateToken(manager, tampered)).rejects.toThrow(
       TokenVerificationError,
+    );
+  });
+
+  it("should reject oversized tokens before parsing (DoS protection)", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      allowedAlgorithms: ["HS256"],
+    });
+    const oversizedToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${"A".repeat(9000)}.signature`;
+
+    await expect(validateToken(manager, oversizedToken)).rejects.toThrow(
+      /exceeds maximum allowed length/i,
+    );
+  });
+
+  it("should honor maxTokenBytes override from config", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      allowedAlgorithms: ["HS256"],
+      maxTokenBytes: 256,
+    });
+    const issued = await manager.generateAccessToken({ sub: "user-1" });
+
+    await expect(validateToken(manager, issued.token)).rejects.toThrow(
+      /exceeds maximum allowed length/i,
     );
   });
 
@@ -125,8 +162,12 @@ describe("Epic 2: validateToken / verify", () => {
       { x5u: "http://keys.example/cert.pem" },
     );
 
-    await expect(validateToken(manager, httpJku)).rejects.toThrow(/must use https/i);
-    await expect(validateToken(manager, httpX5u)).rejects.toThrow(/must use https/i);
+    await expect(validateToken(manager, httpJku)).rejects.toThrow(
+      /must use https/i,
+    );
+    await expect(validateToken(manager, httpX5u)).rejects.toThrow(
+      /must use https/i,
+    );
   });
 
   it("should reject expired tokens (Story 2.3 exp)", async () => {
@@ -148,7 +189,9 @@ describe("Epic 2: validateToken / verify", () => {
       nbf: now + 3600,
     });
 
-    await expect(validateToken(manager, token)).rejects.toThrow(/not yet valid/i);
+    await expect(validateToken(manager, token)).rejects.toThrow(
+      /not yet valid/i,
+    );
   });
 
   it("should require exp and nbf for access token verification (Story 2.3)", async () => {
@@ -295,6 +338,7 @@ describe("Epic 2: validateToken / verify", () => {
   it("should verify RS256 tokens with public key (Story 2.1 key confusion)", async () => {
     const { privateKey, publicKey } = generateRsaKeyPair();
     const manager = createTokenManager({
+      ...requiredTestHooks,
       algorithm: "RS256",
       signingKey: { type: "asymmetric", privateKey, publicKey },
       expiresInSeconds: 3600,
@@ -306,18 +350,75 @@ describe("Epic 2: validateToken / verify", () => {
     expect(result.payload.sub).toBe("user-rsa");
   });
 
+  it("should reject RS256 verification with a weak (<2048-bit) RSA key", async () => {
+    const { privateKey, publicKey } = generateWeakRsaKeyPair();
+    const manager = createTokenManager({
+      algorithm: "RS256",
+      signingKey: { type: "asymmetric", privateKey, publicKey },
+      expiresInSeconds: 3600,
+      allowedAlgorithms: ["RS256"],
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
+    });
+
+    const issued = await manager.generateAccessToken({ sub: "user-weak-rsa" });
+    await expect(validateToken(manager, issued.token)).rejects.toThrow(
+      /at least 2048 bits/i,
+    );
+  });
+
+  it("should verify ES256 tokens signed with P-256 (prime256v1)", async () => {
+    const { privateKey, publicKey } = generateEcKeyPair();
+    const manager = createTokenManager({
+      ...requiredTestHooks,
+      algorithm: "ES256",
+      signingKey: { type: "asymmetric", privateKey, publicKey },
+      expiresInSeconds: 3600,
+      allowedAlgorithms: ["ES256"],
+    });
+
+    const issued = await manager.generateAccessToken({ sub: "user-es256" });
+    const result = await manager.verify(issued.token);
+    expect(result.payload.sub).toBe("user-es256");
+  });
+
+  it("should reject ES256 verification with a non-P-256 EC public key", async () => {
+    const { privateKey } = generateEcKeyPair();
+    const { publicKey: wrongCurvePublicKey } = generateNonP256EcKeyPair();
+    const manager = createTokenManager({
+      ...requiredTestHooks,
+      algorithm: "ES256",
+      signingKey: {
+        type: "asymmetric",
+        privateKey,
+        publicKey: wrongCurvePublicKey,
+      },
+      expiresInSeconds: 3600,
+      allowedAlgorithms: ["ES256"],
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "user-wrong-curve",
+    });
+    await expect(validateToken(manager, issued.token)).rejects.toThrow(
+      /prime256v1/i,
+    );
+  });
+
   it("should reject revoked sessions via isSessionRevoked", async () => {
     const manager = createTokenManager({
       ...baseConfig,
       trustedIssuers: undefined,
       audience: undefined,
       isSessionRevoked: async ({ jti }) => jti === "revoked-jti",
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
     const token = buildSignedTestJwt(
       { ...baseConfig, trustedIssuers: undefined, audience: undefined },
       {
-      sub: "user-1",
-      jti: "revoked-jti",
+        sub: "user-1",
+        jti: "revoked-jti",
       },
     );
 
@@ -325,13 +426,17 @@ describe("Epic 2: validateToken / verify", () => {
   });
 
   it("should reject tokens issued before getTokensInvalidBefore cutoff", async () => {
-    const invalidBeforeBySub = new Map<string, number>([["user-cutoff", 2_000_000_000]]);
+    const invalidBeforeBySub = new Map<string, number>([
+      ["user-cutoff", 2_000_000_000],
+    ]);
 
     const manager = createTokenManager({
       ...baseConfig,
       trustedIssuers: undefined,
       audience: undefined,
       getTokensInvalidBefore: async (sub) => invalidBeforeBySub.get(sub),
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const token = buildSignedTestJwt(
@@ -345,7 +450,9 @@ describe("Epic 2: validateToken / verify", () => {
       },
     );
 
-    await expect(validateToken(manager, token)).rejects.toThrow(/invalidation cutoff/i);
+    await expect(validateToken(manager, token)).rejects.toThrow(
+      /invalidation cutoff/i,
+    );
   });
 
   it("should reject tokens via isSessionRevoked using iat-aware policy", async () => {
@@ -355,6 +462,8 @@ describe("Epic 2: validateToken / verify", () => {
       audience: undefined,
       isSessionRevoked: async ({ iat, sub }) =>
         sub === "user-ts" && iat < 2_000_000_000,
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const token = buildSignedTestJwt(
@@ -378,10 +487,15 @@ describe("Epic 2: validateToken / verify", () => {
       audience: undefined,
       refreshTokenEnabled: true,
       refreshTokenExpiresInSeconds: 86400,
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const reauthAt = 2_000_000_000;
-    const issued = await manager.generateAccessToken({ sub: "user-fresh" }, { reauthAt });
+    const issued = await manager.generateAccessToken(
+      { sub: "user-fresh" },
+      { reauthAt },
+    );
 
     const access = await manager.verify(issued.token, { purpose: "access" });
     expect(access.claims.reauth_at).toBe(reauthAt);
@@ -400,6 +514,8 @@ describe("Epic 2: validateToken / verify", () => {
       audience: undefined,
       getMinimumReauthAt: async (sub) =>
         sub === "user-stale" ? 2_000_000_000 : undefined,
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const token = buildSignedTestJwt(
@@ -421,6 +537,8 @@ describe("Epic 2: validateToken / verify", () => {
       trustedIssuers: undefined,
       audience: undefined,
       requireReauthAtClaim: true,
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const token = buildSignedTestJwt(
@@ -440,6 +558,8 @@ describe("Epic 2: validateToken / verify", () => {
       ...baseConfig,
       trustedIssuers: undefined,
       audience: undefined,
+      onSessionTerminate: async () => {},
+      consumeRefreshToken: async () => true,
     });
 
     const token = buildSignedTestJwt(

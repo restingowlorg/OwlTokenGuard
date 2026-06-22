@@ -4,7 +4,10 @@ import type { VerifyOptions, VerifyResult } from "../validation/types";
 import { TokenVerificationError } from "../errors/TokenVerificationError";
 import { UntrustedKeySourceError } from "../errors/UntrustedKeySourceError";
 
-export interface ExpressVerifyTokenOptions extends Omit<VerifyOptions, "onVerified"> {
+export interface ExpressVerifyTokenOptions extends Omit<
+  VerifyOptions,
+  "onVerified"
+> {
   /** Extract raw JWT from request (default: Authorization Bearer). */
   extractToken?: (req: Request) => string | undefined;
   /**
@@ -34,8 +37,11 @@ export function expressVerifyToken(
   tokenManager: TokenManager,
   options: ExpressVerifyTokenOptions = {},
 ) {
-  const { onVerified, extractToken: extractTokenOption, ...verifyOptions } =
-    options;
+  const {
+    onVerified,
+    extractToken: extractTokenOption,
+    ...verifyOptions
+  } = options;
   const extractToken = extractTokenOption ?? defaultExtractBearerToken;
 
   return async (req: Request, res: Response, next: NextFunction) => {

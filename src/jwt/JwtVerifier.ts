@@ -7,9 +7,13 @@ import {
 } from "crypto";
 import { TokenVerificationError } from "../errors/TokenVerificationError";
 import type { SigningAlgorithm } from "../security/AlgorithmGuard";
-import { AlgorithmGuard } from "../security/AlgorithmGuard";
+import { AlgorithmGuard, ES256_NAMED_CURVE } from "../security/AlgorithmGuard";
 import { TrustedKeySourceGuard } from "../security/TrustedKeySourceGuard";
 import type { TokenConfig } from "../config/types";
+import { DEFAULT_MAX_JWT_BYTES } from "../config/defaults";
+
+/** Minimum RSA modulus length (bits) accepted for RS256 verification. */
+export const MIN_RSA_MODULUS_BITS = 2048;
 
 export interface ParsedJwt {
   header: Record<string, unknown>;
@@ -25,7 +29,18 @@ export type ResolvedVerificationMaterial =
       algorithm: "RS256" | "ES256";
     };
 
-function decodeJsonSegment(segment: string, label: string): Record<string, unknown> {
+function assertTokenWithinSizeLimit(token: string, maxBytes: number): void {
+  if (Buffer.byteLength(token, "utf8") > maxBytes) {
+    throw new TokenVerificationError(
+      `JWT exceeds maximum allowed length of ${maxBytes} bytes`,
+    );
+  }
+}
+
+function decodeJsonSegment(
+  segment: string,
+  label: string,
+): Record<string, unknown> {
   try {
     const json = Buffer.from(segment, "base64url").toString("utf8");
     const value = JSON.parse(json) as unknown;
@@ -46,6 +61,9 @@ export function verifyJwtSignatureFirst(
   token: string,
   config: TokenConfig,
 ): ParsedJwt {
+  const maxBytes = config.maxTokenBytes ?? DEFAULT_MAX_JWT_BYTES;
+  assertTokenWithinSizeLimit(token, maxBytes);
+
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new TokenVerificationError("Invalid JWT format");
@@ -180,11 +198,33 @@ export function resolveVerificationMaterial(
   }
 
   const publicKey = createPublicKey(publicKeyPem);
-  if (algorithm === "RS256" && publicKey.asymmetricKeyType !== "rsa") {
-    throw new TokenVerificationError("RS256 verification requires an RSA public key");
+  if (algorithm === "RS256") {
+    if (publicKey.asymmetricKeyType !== "rsa") {
+      throw new TokenVerificationError(
+        "RS256 verification requires an RSA public key",
+      );
+    }
+    // Reject weak RSA keys (e.g. 512/1024-bit). Fail shut when the modulus
+    // length cannot be determined rather than trusting an unverifiable key.
+    const modulusLength = publicKey.asymmetricKeyDetails?.modulusLength;
+    if (modulusLength === undefined || modulusLength < MIN_RSA_MODULUS_BITS) {
+      throw new TokenVerificationError(
+        `RS256 verification requires an RSA key of at least ${MIN_RSA_MODULUS_BITS} bits`,
+      );
+    }
   }
-  if (algorithm === "ES256" && publicKey.asymmetricKeyType !== "ec") {
-    throw new TokenVerificationError("ES256 verification requires an EC public key");
+  if (algorithm === "ES256") {
+    if (publicKey.asymmetricKeyType !== "ec") {
+      throw new TokenVerificationError(
+        "ES256 verification requires an EC public key",
+      );
+    }
+    const namedCurve = publicKey.asymmetricKeyDetails?.namedCurve;
+    if (namedCurve !== ES256_NAMED_CURVE) {
+      throw new TokenVerificationError(
+        `ES256 verification requires the ${ES256_NAMED_CURVE} curve (P-256)`,
+      );
+    }
   }
 
   return {

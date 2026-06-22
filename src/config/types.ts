@@ -27,7 +27,7 @@ export interface TokenConfig extends VerificationPolicy {
   payloadCipher?: PayloadCipher;
   failOnCipherError?: boolean;
   /** Invoked when rotating sessions via `previousSession` or explicit termination. */
-  onSessionTerminate?: (context: SessionTerminateContext) => Promise<void>;
+  onSessionTerminate: (context: SessionTerminateContext) => Promise<void>;
   /** Required `exp` claim offset in seconds from issuance. */
   expiresInSeconds: number;
   /** Issue a refresh JWT alongside each access token. */
@@ -48,6 +48,8 @@ export interface TokenConfig extends VerificationPolicy {
   consumeRefreshToken?: (
     context: RefreshTokenConsumeContext,
   ) => Promise<boolean>;
+  /** Maximum JWT string size (bytes) accepted during verification (default: 8192). */
+  maxTokenBytes?: number;
   debug?: boolean;
   customLogger?: ILogger;
 }

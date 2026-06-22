@@ -1,6 +1,10 @@
 import { AlgorithmGuard } from "../src/security/AlgorithmGuard";
 import { SecurityConfigurationError } from "../src/errors/SecurityConfigurationError";
-import { generateRsaKeyPair } from "./helpers/keys";
+import {
+  generateEcKeyPair,
+  generateNonP256EcKeyPair,
+  generateRsaKeyPair,
+} from "./helpers/keys";
 
 describe("AlgorithmGuard", () => {
   it("should reject the none algorithm", () => {
@@ -33,5 +37,25 @@ describe("AlgorithmGuard", () => {
         privateKey,
       }),
     ).toThrow(SecurityConfigurationError);
+  });
+
+  it("should accept P-256 EC keys for ES256 signing", () => {
+    const { privateKey } = generateEcKeyPair();
+    expect(() =>
+      AlgorithmGuard.validateAlgorithm("ES256", {
+        type: "asymmetric",
+        privateKey,
+      }),
+    ).not.toThrow();
+  });
+
+  it("should reject non-P-256 EC keys for ES256 signing", () => {
+    const { privateKey } = generateNonP256EcKeyPair();
+    expect(() =>
+      AlgorithmGuard.validateAlgorithm("ES256", {
+        type: "asymmetric",
+        privateKey,
+      }),
+    ).toThrow(/prime256v1/i);
   });
 });

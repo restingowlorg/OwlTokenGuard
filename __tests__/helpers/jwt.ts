@@ -1,8 +1,4 @@
-import {
-  createHmac,
-  sign,
-  type KeyObject,
-} from "crypto";
+import { createHmac, sign, type KeyObject } from "crypto";
 import {
   resolveSigningMaterial,
   type ResolvedSigningMaterial,
@@ -23,11 +19,13 @@ function signInput(
   let signature: Buffer;
   if (material.kind === "hmac") {
     const hash = material.algorithm === "HS512" ? "sha512" : "sha256";
-    signature = createHmac(hash, material.secret)
-      .update(signingInput)
-      .digest();
+    signature = createHmac(hash, material.secret).update(signingInput).digest();
   } else if (material.algorithm === "RS256") {
-    signature = sign("RSA-SHA256", Buffer.from(signingInput), material.privateKey);
+    signature = sign(
+      "RSA-SHA256",
+      Buffer.from(signingInput),
+      material.privateKey,
+    );
   } else {
     signature = sign("sha256", Buffer.from(signingInput), {
       key: material.privateKey,
@@ -51,7 +49,8 @@ export function buildSignedTestJwt(
   payload: Record<string, unknown>,
   headerOverrides: Record<string, unknown> = {},
 ): string {
-  const algorithm = (config.algorithm ?? defaults.algorithm) as SigningAlgorithm;
+  const algorithm = (config.algorithm ??
+    defaults.algorithm) as SigningAlgorithm;
   const now = Math.floor(Date.now() / 1000);
   const jwtPayload = {
     iat: now,

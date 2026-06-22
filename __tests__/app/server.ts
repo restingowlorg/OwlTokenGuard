@@ -5,5 +5,5 @@ const { app } = createShowcaseApp();
 
 app.listen(port, () => {
   console.log(`Showcase API listening on http://localhost:${port}`);
-  console.log("Try: POST /auth/login  { \"sub\": \"demo-user\" }");
+  console.log('Try: POST /auth/login  { "sub": "demo-user" }');
 });

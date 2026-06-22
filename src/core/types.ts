@@ -66,8 +66,7 @@ export interface ReferenceIssuanceOptions {
 
 /** Options for combined JWT + reference issuance (`generate`). */
 export interface GenerateOptions
-  extends AccessTokenOptions,
-    ReferenceIssuanceOptions {}
+  extends AccessTokenOptions, ReferenceIssuanceOptions {}
 
 /** Signed JWT access token with standard claims. */
 export interface AccessTokenResult {
@@ -105,7 +104,7 @@ export interface RotateOptions {
 
 export interface RevokeTokenOptions {
   /** Enforce token_use during verification (e.g. `"refresh"` for logout cookies). */
-  purpose?: "access" | "id" | "refresh";
+  purpose: "access" | "id" | "refresh";
   /**
    * When set, passed to `onSessionTerminate` to invalidate tokens issued before this Unix timestamp.
    * Omit to revoke only the presented token's `jti`.

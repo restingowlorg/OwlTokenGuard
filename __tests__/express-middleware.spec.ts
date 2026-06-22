@@ -7,8 +7,10 @@ import {
 } from "../src/middlewares/express";
 import { TEST_HMAC_SECRET } from "./helpers/keys";
 import { buildSignedTestJwt } from "./helpers/jwt";
+import { requiredTestHooks } from "./helpers/config";
 
 const managerConfig = {
+  ...requiredTestHooks,
   algorithm: "HS256" as const,
   hmacSecret: TEST_HMAC_SECRET,
   expiresInSeconds: 3600,
@@ -65,7 +67,11 @@ describe("expressVerifyToken middleware", () => {
 
   it("should return 401 when token signature is tampered", async () => {
     const issued = await manager.generateAccessToken({ sub: "user-1" });
-    const tampered = `${issued.token.slice(0, -1)}x`;
+    const [header, payload, signature] = issued.token.split(".");
+    // Flip the first signature character (carries 6 significant bits, so the
+    // decoded signature bytes always change) to deterministically tamper it.
+    const flipped = signature[0] === "A" ? "B" : "A";
+    const tampered = `${header}.${payload}.${flipped}${signature.slice(1)}`;
 
     const response = await request(app)
       .get("/api/profile")
@@ -105,10 +111,7 @@ describe("expressVerifyToken middleware", () => {
   });
 
   it("should support validateTokenMiddleware alias", async () => {
-    const aliasApp = createTestApp(
-      "/secure",
-      validateTokenMiddleware(manager),
-    );
+    const aliasApp = createTestApp("/secure", validateTokenMiddleware(manager));
     const issued = await manager.generateAccessToken({ sub: "alias-user" });
 
     const response = await request(aliasApp)
@@ -132,7 +135,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "hook-pass-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "hook-pass-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-pass/profile")
@@ -156,7 +161,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "auto-next-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "auto-next-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-auto-next/profile")
@@ -181,7 +188,9 @@ describe("expressVerifyToken middleware", () => {
           },
         }),
       );
-      const issued = await manager.generateAccessToken({ sub: "hook-fail-user" });
+      const issued = await manager.generateAccessToken({
+        sub: "hook-fail-user",
+      });
 
       const response = await request(hookApp)
         .get("/hook-fail/profile")

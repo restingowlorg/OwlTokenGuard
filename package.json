@@ -1,25 +1,44 @@
 {
-  "name": "@restingowlorg/ossec-cryptography",
+  "name": "@restingowlorg/owltokenguard",
   "version": "1.0.0",
-  "description": "Minimal token-management foundation for Node.js: opaque token issuance and HMAC fingerprints (clean architecture MVP layer)",
+  "description": "OwlTokenGuard: OWASP-aligned token issuance, refresh rotation, verification, and session revocation for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc --declaration",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit && tsc --noEmit -p __tests__/tsconfig.json",
     "test": "jest",
-    "prepare": "husky",
+    "format": "prettier --write \"src/**/*.ts\" \"__tests__/**/*.ts\" \"docs/**/*.md\" \"*.{json,md}\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"__tests__/**/*.ts\" \"docs/**/*.md\" \"*.{json,md}\"",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish",
+    "release:validate": "npm run format:check && npm run typecheck && npm run build && npm test",
+    "prepare": "is-ci || husky",
     "prepublishOnly": "npm run clean && npm run build"
   },
   "keywords": [
+    "owltokenguard",
     "token",
-    "opaque-token",
-    "session-token",
+    "jwt",
+    "access-token",
     "refresh-token",
+    "token-rotation",
+    "session-revocation",
+    "opaque-token",
     "hmac",
     "timing-safe",
     "framework-agnostic",
@@ -27,21 +46,32 @@
     "nodejs",
     "typescript",
     "security",
+    "owasp",
     "clean-architecture"
   ],
-  "author": "OSSec Platform",
+  "author": {
+    "name": "Resting Owl",
+    "url": "https://github.com/restingowlorg"
+  },
   "license": "MIT",
   "type": "commonjs",
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/OSSecPlatform/ossec-cryptography-library"
+    "url": "git+https://github.com/restingowlorg/OwlTokenGuard.git"
   },
+  "bugs": {
+    "url": "https://github.com/restingowlorg/OwlTokenGuard/issues"
+  },
+  "homepage": "https://github.com/restingowlorg/OwlTokenGuard#readme",
   "devDependencies": {
+    "@changesets/cli": "^2.29.7",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
+    "@secretlint/quick-start": "^8.4.0",
+    "@secretlint/secretlint-rule-preset-recommend": "^8.4.0",
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.2.0",
@@ -49,7 +79,10 @@
     "express": "^5.2.1",
     "fastify": "5.8.5",
     "husky": "^9.1.7",
+    "is-ci": "^4.1.0",
     "jest": "^30.2.0",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.4.2",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
     "typescript": "^5.8.2"
