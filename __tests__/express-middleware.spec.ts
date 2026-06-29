@@ -59,7 +59,7 @@ describe("expressVerifyToken middleware", () => {
   it("should return 401 when Authorization header is missing", async () => {
     const response = await request(app).get("/api/profile").expect(401);
     expect(response.body.error).toBe("Unauthorized");
-    expect(response.body.message).toMatch(/authorization header/i);
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should return 401 when Bearer token is invalid", async () => {
@@ -69,6 +69,7 @@ describe("expressVerifyToken middleware", () => {
       .expect(401);
 
     expect(response.body.error).toBe("Unauthorized");
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should return 401 when token signature is tampered", async () => {
@@ -99,7 +100,46 @@ describe("expressVerifyToken middleware", () => {
       .set("Authorization", `Bearer ${expired}`)
       .expect(401);
 
+    expect(response.body.message).toBe("Invalid or expired token");
+  });
+
+  it("should expose detailed auth errors only when explicitly enabled", async () => {
+    const detailApp = createTestApp(
+      "/api",
+      expressVerifyToken(manager, {
+        purpose: "access",
+        exposeErrorDetails: true,
+      }),
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const expired = buildSignedTestJwt(managerConfig, {
+      sub: "user-1",
+      exp: now - 60,
+    });
+
+    const response = await request(detailApp)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${expired}`)
+      .expect(401);
+
     expect(response.body.message).toMatch(/expired/i);
+  });
+
+  it("should call onError for server-side auth diagnostics", async () => {
+    const seen: string[] = [];
+    const diagnosticApp = createTestApp(
+      "/api",
+      expressVerifyToken(manager, {
+        purpose: "access",
+        onError: (error) => {
+          seen.push(error.message);
+        },
+      }),
+    );
+
+    await request(diagnosticApp).get("/api/profile").expect(401);
+
+    expect(seen).toEqual(["Missing or invalid Authorization header"]);
   });
 
   it("should allow protected routes with a valid Bearer token", async () => {
@@ -132,7 +172,7 @@ describe("expressVerifyToken middleware", () => {
       .expect(401);
 
     expect(response.body.error).toBe("Unauthorized");
-    expect(response.body.message).toMatch(/access token/i);
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should support validateTokenMiddleware alias", async () => {

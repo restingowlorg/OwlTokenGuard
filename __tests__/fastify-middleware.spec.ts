@@ -63,7 +63,7 @@ describe("fastifyVerifyToken middleware", () => {
       .get("/api/profile")
       .expect(401);
     expect(response.body.error).toBe("Unauthorized");
-    expect(response.body.message).toMatch(/authorization header/i);
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should return 401 when Bearer token is invalid", async () => {
@@ -73,6 +73,7 @@ describe("fastifyVerifyToken middleware", () => {
       .expect(401);
 
     expect(response.body.error).toBe("Unauthorized");
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should return 401 when token signature is tampered", async () => {
@@ -103,7 +104,46 @@ describe("fastifyVerifyToken middleware", () => {
       .set("Authorization", `Bearer ${expired}`)
       .expect(401);
 
+    expect(response.body.message).toBe("Invalid or expired token");
+  });
+
+  it("should expose detailed auth errors only when explicitly enabled", async () => {
+    const detailApp = await createTestApp(
+      fastifyVerifyToken(manager, {
+        purpose: "access",
+        exposeErrorDetails: true,
+      }),
+    );
+    const now = Math.floor(Date.now() / 1000);
+    const expired = buildSignedTestJwt(managerConfig, {
+      sub: "user-1",
+      exp: now - 60,
+    });
+
+    const response = await supertest(detailApp.server)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${expired}`)
+      .expect(401);
+
     expect(response.body.message).toMatch(/expired/i);
+    await detailApp.close();
+  });
+
+  it("should call onError for server-side auth diagnostics", async () => {
+    const seen: string[] = [];
+    const diagnosticApp = await createTestApp(
+      fastifyVerifyToken(manager, {
+        purpose: "access",
+        onError: (error) => {
+          seen.push(error.message);
+        },
+      }),
+    );
+
+    await supertest(diagnosticApp.server).get("/api/profile").expect(401);
+
+    expect(seen).toEqual(["Missing or invalid Authorization header"]);
+    await diagnosticApp.close();
   });
 
   it("should allow protected routes with a valid Bearer token", async () => {
@@ -136,7 +176,7 @@ describe("fastifyVerifyToken middleware", () => {
       .expect(401);
 
     expect(response.body.error).toBe("Unauthorized");
-    expect(response.body.message).toMatch(/access token/i);
+    expect(response.body.message).toBe("Invalid or expired token");
   });
 
   it("should support validateTokenPreHandler alias", async () => {

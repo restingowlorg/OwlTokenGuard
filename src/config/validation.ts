@@ -31,6 +31,7 @@ export function validateConfig(config: TokenConfig): void {
   validatePositiveIntegerSeconds(config.expiresInSeconds, "expiresInSeconds");
   validateIssuer(config.issuer);
   validateAudience(config.audience);
+  validateCallbackFields(config);
 
   const algorithm = config.algorithm ?? defaults.algorithm;
   AlgorithmGuard.assertAllowed(algorithm);
@@ -46,6 +47,39 @@ export function validateConfig(config: TokenConfig): void {
     validatePositiveIntegerSeconds(
       config.refreshTokenExpiresInSeconds,
       "refreshTokenExpiresInSeconds",
+    );
+  }
+}
+
+function validateCallbackFields(config: TokenConfig): void {
+  validateFunctionField(config.onSessionTerminate, "onSessionTerminate", true);
+  validateFunctionField(config.onRefreshTokenIssued, "onRefreshTokenIssued");
+  validateFunctionField(config.consumeRefreshToken, "consumeRefreshToken");
+  validateFunctionField(
+    config.getTokensInvalidBefore,
+    "getTokensInvalidBefore",
+  );
+  validateFunctionField(config.getMinimumReauthAt, "getMinimumReauthAt");
+  validateFunctionField(config.isSessionRevoked, "isSessionRevoked");
+}
+
+function validateFunctionField(
+  value: unknown,
+  fieldName: string,
+  required = false,
+): void {
+  if (value === undefined) {
+    if (!required) {
+      return;
+    }
+    throw new SecurityConfigurationError(
+      `${fieldName} must be a function when configured`,
+    );
+  }
+
+  if (typeof value !== "function") {
+    throw new SecurityConfigurationError(
+      `${fieldName} must be a function when configured`,
     );
   }
 }

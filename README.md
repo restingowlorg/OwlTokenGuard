@@ -246,6 +246,20 @@ const rotated: RotateResult = await tokenManager.rotate(refreshToken);
 Wire rotation persistence with `onRefreshTokenIssued` and `consumeRefreshToken` so each refresh JWT is stored once and consumed atomically on rotate.
 Persistent refresh-token state, replay response, logout-all-devices, idle timeout, and absolute session lifetime should be implemented by OwlSessionGuard or your application session store.
 
+### Store Token Digests, Not Raw Tokens
+
+```ts
+import { createTokenDigest } from "@restingowlorg/owltokenguard";
+
+const digest = createTokenDigest(refreshToken, {
+  pepper: process.env.TOKEN_DIGEST_PEPPER!,
+});
+
+await refreshTokenStore.save({ digest, subject: "user-123" });
+```
+
+Use token digests for lookup values when integrating with OwlSessionGuard or an application-owned session store. Prefer the peppered HMAC form for stored refresh-token records because it remains safer if the database leaks.
+
 ### Revoke and Terminate Sessions
 
 ```ts

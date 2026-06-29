@@ -29,10 +29,24 @@ export type ResolvedVerificationMaterial =
       algorithm: "RS256" | "ES256";
     };
 
+const BASE64URL_SEGMENT_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 function assertTokenWithinSizeLimit(token: string, maxBytes: number): void {
   if (Buffer.byteLength(token, "utf8") > maxBytes) {
     throw new TokenVerificationError(
       `JWT exceeds maximum allowed length of ${maxBytes} bytes`,
+    );
+  }
+}
+
+function assertBase64UrlSegment(segment: string, label: string): void {
+  if (
+    segment.length === 0 ||
+    segment.length % 4 === 1 ||
+    !BASE64URL_SEGMENT_PATTERN.test(segment)
+  ) {
+    throw new TokenVerificationError(
+      `JWT ${label} is not a valid base64url segment`,
     );
   }
 }
@@ -70,6 +84,10 @@ export function verifyJwtSignatureFirst(
   }
 
   const [headerSegment, payloadSegment, signatureSegment] = parts;
+  assertBase64UrlSegment(headerSegment, "header");
+  assertBase64UrlSegment(payloadSegment, "payload");
+  assertBase64UrlSegment(signatureSegment, "signature");
+
   const header = decodeJsonSegment(headerSegment, "header");
   const signingInput = `${headerSegment}.${payloadSegment}`;
 

@@ -173,6 +173,39 @@ describe("Epic 2: validateToken / verify", () => {
     );
   });
 
+  it.each([
+    ["header", 0],
+    ["payload", 1],
+    ["signature", 2],
+  ])(
+    "should reject JWTs with invalid base64url %s segments",
+    async (_label, segmentIndex) => {
+      const manager = createTokenManager(baseConfig);
+      const issued = await manager.generateAccessToken({
+        sub: "malformed-segment-user",
+      });
+      const parts = issued.token.split(".");
+      parts[segmentIndex] = `${parts[segmentIndex]}*`;
+
+      await expect(validateToken(manager, parts.join("."))).rejects.toThrow(
+        /base64url/i,
+      );
+    },
+  );
+
+  it("should reject JWTs with empty base64url segments", async () => {
+    const manager = createTokenManager(baseConfig);
+    const issued = await manager.generateAccessToken({
+      sub: "empty-segment-user",
+    });
+    const parts = issued.token.split(".");
+    parts[1] = "";
+
+    await expect(validateToken(manager, parts.join("."))).rejects.toThrow(
+      /base64url/i,
+    );
+  });
+
   it("should honor maxTokenBytes override from config", async () => {
     const manager = createTokenManager({
       ...baseConfig,

@@ -14,6 +14,14 @@ export interface FastifyVerifyTokenOptions extends Omit<
 > {
   /** Extract raw JWT from request (default: Authorization Bearer). */
   extractToken?: (request: FastifyRequest) => string | undefined;
+  /** Expose internal verification details to clients. Defaults to false. */
+  exposeErrorDetails?: boolean;
+  /** Server-side hook for logging or metrics when authentication fails. */
+  onError?: (
+    error: TokenVerificationError | UntrustedKeySourceError,
+    request: FastifyRequest,
+    reply: FastifyReply,
+  ) => Promise<void> | void;
   /**
    * Hook after verification succeeds. Call `continue` to proceed to the route handler.
    * If omitted, the hook continues automatically when no response is sent.
@@ -37,6 +45,8 @@ function defaultExtractBearerToken(
   return token.length > 0 ? token : undefined;
 }
 
+const DEFAULT_AUTHENTICATION_ERROR_MESSAGE = "Invalid or expired token";
+
 /**
  * Fastify preHandler — runs default verification on every protected request.
  * Attach custom logic via `options.onVerified` or route handlers using `request.auth`.
@@ -47,6 +57,8 @@ export function fastifyVerifyToken(
 ): preHandlerHookHandler {
   const {
     onVerified,
+    onError,
+    exposeErrorDetails = false,
     extractToken: extractTokenOption,
     ...verifyOptions
   } = options;
@@ -56,9 +68,18 @@ export function fastifyVerifyToken(
     try {
       const token = extractToken(request);
       if (!token) {
+        const error = new TokenVerificationError(
+          "Missing or invalid Authorization header",
+        );
+        await onError?.(error, request, reply);
+        if (reply.sent) {
+          return;
+        }
         return reply.status(401).send({
           error: "Unauthorized",
-          message: "Missing or invalid Authorization header",
+          message: exposeErrorDetails
+            ? error.message
+            : DEFAULT_AUTHENTICATION_ERROR_MESSAGE,
         });
       }
 
@@ -83,9 +104,15 @@ export function fastifyVerifyToken(
         error instanceof TokenVerificationError ||
         error instanceof UntrustedKeySourceError
       ) {
+        await onError?.(error, request, reply);
+        if (reply.sent) {
+          return;
+        }
         return reply.status(401).send({
           error: "Unauthorized",
-          message: error.message,
+          message: exposeErrorDetails
+            ? error.message
+            : DEFAULT_AUTHENTICATION_ERROR_MESSAGE,
         });
       }
       throw error;

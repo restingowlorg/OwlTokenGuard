@@ -10,6 +10,14 @@ export interface ExpressVerifyTokenOptions extends Omit<
 > {
   /** Extract raw JWT from request (default: Authorization Bearer). */
   extractToken?: (req: Request) => string | undefined;
+  /** Expose internal verification details to clients. Defaults to false. */
+  exposeErrorDetails?: boolean;
+  /** Server-side hook for logging or metrics when authentication fails. */
+  onError?: (
+    error: TokenVerificationError | UntrustedKeySourceError,
+    req: Request,
+    res: Response,
+  ) => Promise<void> | void;
   /**
    * Hook after verification succeeds. Receives Express `next` for chain control.
    * If omitted, middleware calls `next()` automatically.
@@ -29,6 +37,8 @@ function defaultExtractBearerToken(req: Request): string | undefined {
   return token.length > 0 ? token : undefined;
 }
 
+const DEFAULT_AUTHENTICATION_ERROR_MESSAGE = "Invalid or expired token";
+
 /**
  * Express middleware — runs default verification on every protected request.
  * Attach custom logic via `options.onVerified` or route handlers using `req.auth`.
@@ -39,6 +49,8 @@ export function expressVerifyToken(
 ) {
   const {
     onVerified,
+    onError,
+    exposeErrorDetails = false,
     extractToken: extractTokenOption,
     ...verifyOptions
   } = options;
@@ -48,9 +60,18 @@ export function expressVerifyToken(
     try {
       const token = extractToken(req);
       if (!token) {
+        const error = new TokenVerificationError(
+          "Missing or invalid Authorization header",
+        );
+        await onError?.(error, req, res);
+        if (res.headersSent) {
+          return;
+        }
         return res.status(401).json({
           error: "Unauthorized",
-          message: "Missing or invalid Authorization header",
+          message: exposeErrorDetails
+            ? error.message
+            : DEFAULT_AUTHENTICATION_ERROR_MESSAGE,
         });
       }
 
@@ -78,9 +99,15 @@ export function expressVerifyToken(
         error instanceof TokenVerificationError ||
         error instanceof UntrustedKeySourceError
       ) {
+        await onError?.(error, req, res);
+        if (res.headersSent) {
+          return;
+        }
         return res.status(401).json({
           error: "Unauthorized",
-          message: error.message,
+          message: exposeErrorDetails
+            ? error.message
+            : DEFAULT_AUTHENTICATION_ERROR_MESSAGE,
         });
       }
       next(error);
