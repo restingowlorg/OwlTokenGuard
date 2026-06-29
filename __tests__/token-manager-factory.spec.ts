@@ -146,6 +146,30 @@ describe("createTokenManager", () => {
     ).toThrow(/Invalid public key PEM/i);
   });
 
+  it("should reject an empty configured issuer", () => {
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "HS256",
+        hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
+        issuer: " ",
+      }),
+    ).toThrow(/issuer must be a non-empty string/i);
+  });
+
+  it("should reject an empty configured audience list", () => {
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "HS256",
+        hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
+        audience: [],
+      }),
+    ).toThrow(/audience must be a non-empty string/i);
+  });
+
   it.each([0, -1, NaN, Infinity, 1.5])(
     "should reject invalid expiresInSeconds at startup (%p)",
     (expiresInSeconds) => {

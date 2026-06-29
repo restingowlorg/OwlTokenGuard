@@ -59,6 +59,7 @@ export class TokenIssuer {
     const nbf = now + (options.nbfOffsetSeconds ?? 0);
     const jti = randomUUID();
     const standardClaims: StandardClaims = { iat: now, nbf, jti };
+    applyConfiguredRegisteredClaims(standardClaims, this.config);
     const reauthAt = resolveReauthAt(payload, options);
 
     let jwtPayload: Record<string, unknown>;
@@ -78,6 +79,7 @@ export class TokenIssuer {
     } else {
       jwtPayload = { ...payload, ...standardClaims, token_use: "access" };
     }
+    applyConfiguredRegisteredClaims(jwtPayload, this.config);
 
     if (this.config.expiresInSeconds !== undefined) {
       jwtPayload.exp = now + this.config.expiresInSeconds;
@@ -152,11 +154,13 @@ export class TokenIssuer {
     const jti = randomUUID();
     const expiresAt = now + expiresIn;
     const refreshClaims: StandardClaims = { iat: now, nbf: now, jti };
+    applyConfiguredRegisteredClaims(refreshClaims, this.config);
     const jwtPayload: Record<string, unknown> = {
       ...refreshClaims,
       token_use: "refresh",
       exp: expiresAt,
     };
+    applyConfiguredRegisteredClaims(jwtPayload, this.config);
 
     if (reauthAt !== undefined) {
       jwtPayload[REAUTH_AT_CLAIM] = reauthAt;
@@ -212,6 +216,18 @@ export class TokenIssuer {
       ...access,
       referenceToken: reference.referenceToken,
     };
+  }
+}
+
+function applyConfiguredRegisteredClaims(
+  claims: { iss?: string; aud?: string | string[] },
+  config: TokenConfig,
+): void {
+  if (config.issuer !== undefined) {
+    claims.iss = config.issuer;
+  }
+  if (config.audience !== undefined) {
+    claims.aud = config.audience;
   }
 }
 

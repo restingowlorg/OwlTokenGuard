@@ -29,6 +29,8 @@ export function normalizeConfig(config: TokenConfig): TokenConfig {
 /** Story 1.1: fail-fast config validation at startup. */
 export function validateConfig(config: TokenConfig): void {
   validatePositiveIntegerSeconds(config.expiresInSeconds, "expiresInSeconds");
+  validateIssuer(config.issuer);
+  validateAudience(config.audience);
 
   const algorithm = config.algorithm ?? defaults.algorithm;
   AlgorithmGuard.assertAllowed(algorithm);
@@ -44,6 +46,45 @@ export function validateConfig(config: TokenConfig): void {
     validatePositiveIntegerSeconds(
       config.refreshTokenExpiresInSeconds,
       "refreshTokenExpiresInSeconds",
+    );
+  }
+}
+
+function validateIssuer(issuer: unknown): void {
+  if (issuer === undefined) {
+    return;
+  }
+
+  if (typeof issuer !== "string" || issuer.trim().length === 0) {
+    throw new SecurityConfigurationError(
+      "issuer must be a non-empty string when configured",
+    );
+  }
+}
+
+function validateAudience(audience: unknown): void {
+  if (audience === undefined) {
+    return;
+  }
+
+  if (typeof audience === "string") {
+    if (audience.trim().length === 0) {
+      throw new SecurityConfigurationError(
+        "audience must be a non-empty string when configured",
+      );
+    }
+    return;
+  }
+
+  if (
+    !Array.isArray(audience) ||
+    audience.length === 0 ||
+    audience.some(
+      (value) => typeof value !== "string" || value.trim().length === 0,
+    )
+  ) {
+    throw new SecurityConfigurationError(
+      "audience must be a non-empty string or array of non-empty strings",
     );
   }
 }

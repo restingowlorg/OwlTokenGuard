@@ -8,6 +8,10 @@ export interface StandardClaims {
   iat: number;
   nbf: number;
   jti: string;
+  /** Issuer (`iss`) stamped from TokenConfig. */
+  iss?: string;
+  /** Audience (`aud`) stamped from TokenConfig. */
+  aud?: string | string[];
   /** Present when stamped at issuance — last email/MFA reauthentication time. */
   reauth_at?: number;
 }

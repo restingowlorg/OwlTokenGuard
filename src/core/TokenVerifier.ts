@@ -318,19 +318,32 @@ export class TokenVerifier {
       );
     }
 
-    return {
+    const claims: VerifyResult["claims"] = {
       iat,
       nbf,
       jti,
-      reauth_at:
-        typeof payload[REAUTH_AT_CLAIM] === "number"
-          ? payload[REAUTH_AT_CLAIM]
-          : undefined,
-      exp: typeof payload.exp === "number" ? payload.exp : undefined,
-      iss: typeof payload.iss === "string" ? payload.iss : undefined,
-      aud: payload.aud as string | string[] | undefined,
-      token_use:
-        typeof payload.token_use === "string" ? payload.token_use : undefined,
     };
+
+    if (typeof payload[REAUTH_AT_CLAIM] === "number") {
+      claims.reauth_at = payload[REAUTH_AT_CLAIM];
+    }
+    if (typeof payload.exp === "number") {
+      claims.exp = payload.exp;
+    }
+    if (typeof payload.iss === "string") {
+      claims.iss = payload.iss;
+    }
+    if (
+      typeof payload.aud === "string" ||
+      (Array.isArray(payload.aud) &&
+        payload.aud.every((value) => typeof value === "string"))
+    ) {
+      claims.aud = payload.aud;
+    }
+    if (typeof payload.token_use === "string") {
+      claims.token_use = payload.token_use;
+    }
+
+    return claims;
   }
 }

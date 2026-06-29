@@ -16,6 +16,8 @@ export type SigningKeyMaterial =
 export interface TokenConfig extends VerificationPolicy {
   /** Preferred: RS256 or ES256. HS256/HS512 require high-entropy secrets. */
   algorithm?: SigningAlgorithm;
+  /** Issuer (`iss`) stamped onto issued JWTs. */
+  issuer?: string;
   signingKey?: SigningKeyMaterial;
   /** Minimum 64 characters for HS256/HS512. */
   hmacSecret?: string;

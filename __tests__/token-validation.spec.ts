@@ -2,6 +2,8 @@ import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { validateToken } from "../src/validation/validateToken";
 import { TokenVerificationError } from "../src/errors/TokenVerificationError";
 import { UntrustedKeySourceError } from "../src/errors/UntrustedKeySourceError";
+import { Aes256GcmCipher } from "../src/ciphering/Aes256GcmCipher";
+import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import {
   TEST_HMAC_SECRET,
   generateEcKeyPair,
@@ -40,6 +42,108 @@ describe("Epic 2: validateToken / verify", () => {
 
     expect(result.jti).toBe(issued.claims.jti);
     expect(result.payload.sub).toBe("user-1");
+    expect(result.claims.aud).toBe("my-api");
+  });
+
+  it("should stamp configured issuer and audience on access tokens", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      issuer: "https://issuer.example",
+      allowedAlgorithms: ["HS256"],
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "configured-claims-user",
+      iss: "https://payload.example",
+      aud: "payload-api",
+    });
+
+    const decoded = decodeUnsafeJwtPayload(issued.token);
+    const result = await validateToken(manager, issued.token, {
+      purpose: "access",
+    });
+
+    expect(decoded.iss).toBe("https://issuer.example");
+    expect(decoded.aud).toBe("my-api");
+    expect(issued.claims.iss).toBe("https://issuer.example");
+    expect(issued.claims.aud).toBe("my-api");
+    expect(result.claims.iss).toBe("https://issuer.example");
+    expect(result.claims.aud).toBe("my-api");
+  });
+
+  it("should stamp configured issuer and audience on RS256 access tokens", async () => {
+    const keys = generateRsaKeyPair();
+    const manager = createTokenManager({
+      ...requiredTestHooks,
+      algorithm: "RS256",
+      signingKey: {
+        type: "asymmetric",
+        privateKey: keys.privateKey,
+        publicKey: keys.publicKey,
+      },
+      expiresInSeconds: 3600,
+      issuer: "https://issuer.example",
+      trustedIssuers: ["https://issuer.example"],
+      audience: "my-api",
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "rs256-claims-user",
+    });
+    const result = await validateToken(manager, issued.token, {
+      purpose: "access",
+    });
+
+    expect(result.claims.iss).toBe("https://issuer.example");
+    expect(result.claims.aud).toBe("my-api");
+  });
+
+  it("should stamp configured issuer and audience on refresh tokens", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      issuer: "https://issuer.example",
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "refresh-claims-user",
+    });
+
+    const refresh = await validateToken(manager, issued.refreshToken!, {
+      purpose: "refresh",
+    });
+
+    expect(refresh.claims.iss).toBe("https://issuer.example");
+    expect(refresh.claims.aud).toBe("my-api");
+    expect(issued.refreshClaims?.iss).toBe("https://issuer.example");
+    expect(issued.refreshClaims?.aud).toBe("my-api");
+  });
+
+  it("should verify encrypted tokens with configured issuer and audience", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      issuer: "https://issuer.example",
+      payloadCipher: new Aes256GcmCipher(Buffer.alloc(32, 11)),
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "encrypted-claims-user",
+      role: "admin",
+    });
+    const decoded = decodeUnsafeJwtPayload(issued.token);
+
+    expect(decoded.enc).toBeDefined();
+    expect(decoded.iss).toBe("https://issuer.example");
+    expect(decoded.aud).toBe("my-api");
+    expect(decoded.role).toBeUndefined();
+
+    const result = await validateToken(manager, issued.token, {
+      purpose: "access",
+    });
+    expect(result.payload.sub).toBe("encrypted-claims-user");
+    expect(result.payload.role).toBe("admin");
+    expect(result.claims.iss).toBe("https://issuer.example");
     expect(result.claims.aud).toBe("my-api");
   });
 

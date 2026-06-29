@@ -55,6 +55,9 @@ import { createTokenManager } from "@restingowlorg/owltokenguard";
 const tokenManager = createTokenManager({
   algorithm: "HS256",
   hmacSecret: process.env.JWT_SECRET!,
+  issuer: "https://issuer.example",
+  trustedIssuers: ["https://issuer.example"],
+  audience: "my-api",
   expiresInSeconds: 900,
   refreshTokenEnabled: true,
   refreshTokenExpiresInSeconds: 60 * 60 * 24 * 7,
@@ -72,6 +75,12 @@ const issued = await tokenManager.generateAccessToken(
 const verified = await tokenManager.verify(issued.token, { purpose: "access" });
 console.log(verified.payload.sub); // "user-123"
 ```
+
+## Package Boundary
+
+owltokenguard is the token management library. It owns token-level cryptography: JWT signing, verification, registered claims such as `iss` and `aud`, token purpose checks, optional payload encryption, and opaque reference-token generation. OwlSessionGuard is the session management library and owns session records, storage adapters, idle and absolute timeouts, revoke-all behavior, device binding, breach response, and persistent refresh-token rotation state.
+
+The refresh APIs in this package issue and validate refresh JWTs and expose hooks such as `onRefreshTokenIssued`, `consumeRefreshToken`, and `onSessionTerminate` as integration points. Back those hooks with the session-management library or an application-owned store; this package does not own durable session storage.
 
 ## Signing & Key Material
 
@@ -235,6 +244,7 @@ const rotated: RotateResult = await tokenManager.rotate(refreshToken);
 ```
 
 Wire rotation persistence with `onRefreshTokenIssued` and `consumeRefreshToken` so each refresh JWT is stored once and consumed atomically on rotate.
+Persistent refresh-token state, replay response, logout-all-devices, idle timeout, and absolute session lifetime should be implemented by OwlSessionGuard or your application session store.
 
 ### Revoke and Terminate Sessions
 
@@ -308,6 +318,7 @@ app.post("/auth/refresh", async (req, res) => {
 | Option                         | Type                 | Purpose                                                            |
 | ------------------------------ | -------------------- | ------------------------------------------------------------------ |
 | `algorithm`                    | `SigningAlgorithm`   | Preferred signing algorithm (`HS*`, `RS256`, `ES256`)              |
+| `issuer`                       | `string`             | Issuer claim (`iss`) stamped onto issued JWTs                      |
 | `hmacSecret`                   | `string`             | Shared secret for symmetric signing (min 64 chars for `HS*`)       |
 | `signingKey`                   | key material         | Private/public key material for asymmetric signing                 |
 | `expiresInSeconds`             | `number`             | Access token `exp` offset (positive integer, validated at startup) |
@@ -324,7 +335,7 @@ app.post("/auth/refresh", async (req, res) => {
 | `maxTokenBytes`                | `number`             | Max JWT string size accepted on verify (default: 8192)             |
 | `allowedAlgorithms`            | `SigningAlgorithm[]` | Verification allowlist (defaults to configured `algorithm`)        |
 | `trustedIssuers`               | `string[]`           | Issuer allowlist for verification                                  |
-| `audience`                     | `string \| string[]` | Expected audience for verification                                 |
+| `audience`                     | `string \| string[]` | Audience claim stamped during issuance and expected on verify      |
 
 ### Verification Options (`verify`)
 
