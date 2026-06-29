@@ -11,7 +11,7 @@ import type { VerificationPolicy } from "../validation/types";
 
 export type SigningKeyMaterial =
   | { type: "symmetric"; secret: string }
-  | { type: "asymmetric"; privateKey: string; publicKey?: string };
+  | { type: "asymmetric"; privateKey: string; publicKey: string };
 
 export interface TokenConfig extends VerificationPolicy {
   /** Preferred: RS256 or ES256. HS256/HS512 require high-entropy secrets. */

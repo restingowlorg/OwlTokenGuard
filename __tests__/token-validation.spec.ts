@@ -424,27 +424,23 @@ describe("Epic 2: validateToken / verify", () => {
     expect(result.payload.sub).toBe("user-es256");
   });
 
-  it("should reject ES256 verification with a non-P-256 EC public key", async () => {
+  it("should reject ES256 config with a non-P-256 EC public key", () => {
     const { privateKey } = generateEcKeyPair();
     const { publicKey: wrongCurvePublicKey } = generateNonP256EcKeyPair();
-    const manager = createTokenManager({
-      ...requiredTestHooks,
-      algorithm: "ES256",
-      signingKey: {
-        type: "asymmetric",
-        privateKey,
-        publicKey: wrongCurvePublicKey,
-      },
-      expiresInSeconds: 3600,
-      allowedAlgorithms: ["ES256"],
-    });
 
-    const issued = await manager.generateAccessToken({
-      sub: "user-wrong-curve",
-    });
-    await expect(validateToken(manager, issued.token)).rejects.toThrow(
-      /prime256v1/i,
-    );
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "ES256",
+        signingKey: {
+          type: "asymmetric",
+          privateKey,
+          publicKey: wrongCurvePublicKey,
+        },
+        expiresInSeconds: 3600,
+        allowedAlgorithms: ["ES256"],
+      }),
+    ).toThrow(/prime256v1/i);
   });
 
   it("should reject revoked sessions via isSessionRevoked", async () => {

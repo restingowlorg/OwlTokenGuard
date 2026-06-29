@@ -1,12 +1,20 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { TokenManager } from "../src/core/TokenManager";
 import { defaults } from "../src/config/defaults";
+import { SecurityConfigurationError } from "../src/errors/SecurityConfigurationError";
 import { requiredTestHooks } from "./helpers/config";
+import {
+  TEST_HMAC_SECRET,
+  generateEcKeyPair,
+  generateRsaKeyPair,
+} from "./helpers/keys";
 
 describe("createTokenManager", () => {
   it("should return a TokenManager instance", () => {
     const manager = createTokenManager({
       ...requiredTestHooks,
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
     });
     expect(manager).toBeInstanceOf(TokenManager);
@@ -25,14 +33,22 @@ describe("createTokenManager", () => {
   it("should accept config and expose it on the instance", () => {
     const manager = createTokenManager({
       ...requiredTestHooks,
+      algorithm: "HS256",
+      hmacSecret: TEST_HMAC_SECRET,
       expiresInSeconds: 3600,
     });
     expect(manager.config.expiresInSeconds).toBe(3600);
   });
 
   it("should expose normalized default algorithm and allowlist on the instance", () => {
+    const keys = generateRsaKeyPair();
     const manager = createTokenManager({
       ...requiredTestHooks,
+      signingKey: {
+        type: "asymmetric",
+        privateKey: keys.privateKey,
+        publicKey: keys.publicKey,
+      },
       expiresInSeconds: 3600,
     });
 
@@ -46,12 +62,98 @@ describe("createTokenManager", () => {
     expect(defaults.minHmacSecretLength).toBe(64);
   });
 
+  it("should reject default RS256 config when asymmetric keys are missing", () => {
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(SecurityConfigurationError);
+  });
+
+  it("should reject HS256 config when HMAC secret is missing", () => {
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "HS256",
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(/HMAC secret is required/i);
+  });
+
+  it("should reject RS256 config when private key is missing", () => {
+    const keys = generateRsaKeyPair();
+
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "RS256",
+        signingKey: {
+          type: "asymmetric",
+          publicKey: keys.publicKey,
+        } as never,
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(/Invalid private key PEM/i);
+  });
+
+  it("should reject RS256 config when public key is missing", () => {
+    const keys = generateRsaKeyPair();
+
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "RS256",
+        signingKey: {
+          type: "asymmetric",
+          privateKey: keys.privateKey,
+        } as never,
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(/Public key is required/i);
+  });
+
+  it("should reject ES256 config when public key is missing", () => {
+    const keys = generateEcKeyPair();
+
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "ES256",
+        signingKey: {
+          type: "asymmetric",
+          privateKey: keys.privateKey,
+        } as never,
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(/Public key is required/i);
+  });
+
+  it("should reject invalid asymmetric public key PEM at startup", () => {
+    const keys = generateRsaKeyPair();
+
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        algorithm: "RS256",
+        signingKey: {
+          type: "asymmetric",
+          privateKey: keys.privateKey,
+          publicKey: "not-a-public-key",
+        },
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(/Invalid public key PEM/i);
+  });
+
   it.each([0, -1, NaN, Infinity, 1.5])(
     "should reject invalid expiresInSeconds at startup (%p)",
     (expiresInSeconds) => {
       expect(() =>
         createTokenManager({
           ...requiredTestHooks,
+          algorithm: "HS256",
+          hmacSecret: TEST_HMAC_SECRET,
           expiresInSeconds,
         }),
       ).toThrow(/expiresInSeconds must be a positive integer/i);
@@ -64,6 +166,8 @@ describe("createTokenManager", () => {
       expect(() =>
         createTokenManager({
           ...requiredTestHooks,
+          algorithm: "HS256",
+          hmacSecret: TEST_HMAC_SECRET,
           expiresInSeconds: 3600,
           refreshTokenEnabled: true,
           refreshTokenExpiresInSeconds,
