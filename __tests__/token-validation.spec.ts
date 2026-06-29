@@ -264,6 +264,25 @@ describe("Epic 2: validateToken / verify", () => {
     ).rejects.toThrow(/ID token cannot be used/i);
   });
 
+  it("should reject refresh tokens used as access tokens (Story 2.4)", async () => {
+    const manager = createTokenManager({
+      ...baseConfig,
+      trustedIssuers: undefined,
+      audience: undefined,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
+    });
+    const issued = await manager.generateAccessToken({
+      sub: "user-1",
+      iss: "https://issuer.example",
+      aud: "my-api",
+    });
+
+    await expect(
+      validateToken(manager, issued.refreshToken!, { purpose: "access" }),
+    ).rejects.toThrow(/access token/i);
+  });
+
   it("should reject access verification when token type is missing (Story 2.4)", async () => {
     const manager = createTokenManager(baseConfig);
     const token = buildSignedTestJwt(

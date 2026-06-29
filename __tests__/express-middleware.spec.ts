@@ -110,6 +110,25 @@ describe("expressVerifyToken middleware", () => {
     });
   });
 
+  it("should reject a refresh JWT on access-protected routes", async () => {
+    const refreshManager = createTokenManager({
+      ...managerConfig,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
+    });
+    const issued = await refreshManager.generateAccessToken({
+      sub: "refresh-user",
+    });
+
+    const response = await request(app)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.refreshToken}`)
+      .expect(401);
+
+    expect(response.body.error).toBe("Unauthorized");
+    expect(response.body.message).toMatch(/access token/i);
+  });
+
   it("should support validateTokenMiddleware alias", async () => {
     const aliasApp = createTestApp("/secure", validateTokenMiddleware(manager));
     const issued = await manager.generateAccessToken({ sub: "alias-user" });

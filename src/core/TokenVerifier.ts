@@ -212,7 +212,7 @@ export class TokenVerifier {
     throw new TokenVerificationError("Token is missing required aud claim");
   }
 
-  /** Story 2.4: prevent ID tokens from being used as access tokens. */
+  /** Story 2.4: enforce the requested token purpose exactly. */
   private assertPurpose(
     payload: Record<string, unknown>,
     header: Record<string, unknown>,
@@ -240,6 +240,10 @@ export class TokenVerifier {
       );
     }
 
+    if (effective === purpose) {
+      return;
+    }
+
     if (purpose === "access" && effective === "id") {
       throw new TokenVerificationError(
         "ID token cannot be used as an access token",
@@ -257,6 +261,10 @@ export class TokenVerifier {
         "Token cannot be used as a refresh token",
       );
     }
+
+    throw new TokenVerificationError(
+      `Token cannot be used as a ${purpose} token`,
+    );
   }
 
   private async assertReauthFreshness(
