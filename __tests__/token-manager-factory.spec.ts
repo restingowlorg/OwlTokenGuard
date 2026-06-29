@@ -30,6 +30,16 @@ describe("createTokenManager", () => {
     expect(manager.config.expiresInSeconds).toBe(3600);
   });
 
+  it("should expose normalized default algorithm and allowlist on the instance", () => {
+    const manager = createTokenManager({
+      ...requiredTestHooks,
+      expiresInSeconds: 3600,
+    });
+
+    expect(manager.config.algorithm).toBe("RS256");
+    expect(manager.config.allowedAlgorithms).toEqual(["RS256"]);
+  });
+
   it("should expose defaults for epic 1 configuration", () => {
     expect(defaults.algorithm).toBe("RS256");
     expect(defaults.opaqueEntropyBits).toBe(128);

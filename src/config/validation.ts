@@ -5,6 +5,20 @@ import { SecretValidator } from "../security/SecretValidator";
 import { SecurityConfigurationError } from "../errors/SecurityConfigurationError";
 import { defaults } from "./defaults";
 
+/**
+ * Resolve defaulted configuration once so issuer, verifier, and validation
+ * all operate on the same effective security policy.
+ */
+export function normalizeConfig(config: TokenConfig): TokenConfig {
+  const algorithm = config.algorithm ?? defaults.algorithm;
+
+  return {
+    ...config,
+    algorithm,
+    allowedAlgorithms: config.allowedAlgorithms ?? [algorithm],
+  };
+}
+
 /** Story 1.1: fail-fast config validation at startup. */
 export function validateConfig(config: TokenConfig): void {
   validatePositiveIntegerSeconds(config.expiresInSeconds, "expiresInSeconds");

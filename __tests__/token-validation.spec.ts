@@ -130,6 +130,29 @@ describe("Epic 2: validateToken / verify", () => {
     expect(result.payload.sub).toBe("user-1");
   });
 
+  it("should issue and verify RS256 tokens when algorithm is omitted", async () => {
+    const keys = generateRsaKeyPair();
+    const manager = createTokenManager({
+      ...requiredTestHooks,
+      signingKey: {
+        type: "asymmetric",
+        privateKey: keys.privateKey,
+        publicKey: keys.publicKey,
+      },
+      expiresInSeconds: 3600,
+    });
+
+    const issued = await manager.generateAccessToken({
+      sub: "default-rs256-user",
+    });
+
+    const result = await manager.verify(issued.token, { purpose: "access" });
+    expect(manager.config.algorithm).toBe("RS256");
+    expect(manager.config.allowedAlgorithms).toEqual(["RS256"]);
+    expect(result.payload.sub).toBe("default-rs256-user");
+    expect(result.jti).toBe(issued.claims.jti);
+  });
+
   it("should reject untrusted jku header (Story 2.2)", async () => {
     const manager = createTokenManager({
       ...baseConfig,
