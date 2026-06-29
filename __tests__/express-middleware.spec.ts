@@ -42,8 +42,14 @@ function createTestApp(
 
 describe("expressVerifyToken middleware", () => {
   const manager = createTokenManager(managerConfig);
-  const auth = expressVerifyToken(manager, { purpose: "access" });
-  const app = createTestApp("/api", auth);
+  let app: Express;
+
+  beforeEach(() => {
+    app = createTestApp(
+      "/api",
+      expressVerifyToken(manager, { purpose: "access" }),
+    );
+  });
 
   it("should allow public routes without a token", async () => {
     const response = await request(app).get("/public").expect(200);
