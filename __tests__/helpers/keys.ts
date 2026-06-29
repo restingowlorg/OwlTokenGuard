@@ -12,8 +12,8 @@ export function generateRsaKeyPair(): {
     modulusLength: 2048,
   });
   return {
-    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKey: publicKey.export({ type: "spki", format: "pem" }),
   };
 }
 
@@ -26,8 +26,8 @@ export function generateWeakRsaKeyPair(): {
     modulusLength: 1024,
   });
   return {
-    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKey: publicKey.export({ type: "spki", format: "pem" }),
   };
 }
 
@@ -36,8 +36,8 @@ export function generateEcKeyPair(): { privateKey: string; publicKey: string } {
     namedCurve: "P-256",
   });
   return {
-    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKey: publicKey.export({ type: "spki", format: "pem" }),
   };
 }
 
@@ -50,7 +50,7 @@ export function generateNonP256EcKeyPair(): {
     namedCurve: "P-384",
   });
   return {
-    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
-    publicKey: publicKey.export({ type: "spki", format: "pem" }) as string,
+    privateKey: privateKey.export({ type: "pkcs8", format: "pem" }),
+    publicKey: publicKey.export({ type: "spki", format: "pem" }),
   };
 }

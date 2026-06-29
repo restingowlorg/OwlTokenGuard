@@ -1,4 +1,4 @@
-import { createHmac, sign, type KeyObject } from "crypto";
+import { createHmac, sign } from "crypto";
 import {
   resolveSigningMaterial,
   type ResolvedSigningMaterial,
@@ -49,8 +49,7 @@ export function buildSignedTestJwt(
   payload: Record<string, unknown>,
   headerOverrides: Record<string, unknown> = {},
 ): string {
-  const algorithm = (config.algorithm ??
-    defaults.algorithm) as SigningAlgorithm;
+  const algorithm: SigningAlgorithm = config.algorithm ?? defaults.algorithm;
   const now = Math.floor(Date.now() / 1000);
   const jwtPayload = {
     iat: now,

@@ -1,7 +1,7 @@
 import { createTokenManager } from "../src/factories/TokenManagerFactory";
 import { decodeUnsafeJwtPayload } from "../src/jwt/JwtSigner";
 import { TEST_HMAC_SECRET, generateRsaKeyPair } from "./helpers/keys";
-import { noopOnSessionTerminate, requiredTestHooks } from "./helpers/config";
+import { requiredTestHooks } from "./helpers/config";
 
 /**
  * Integration-style tests mirroring documented usage:

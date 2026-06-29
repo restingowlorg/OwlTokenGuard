@@ -33,10 +33,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 22.x
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Secret scan tracked files
         run: git ls-files -z | xargs -0 npx secretlint

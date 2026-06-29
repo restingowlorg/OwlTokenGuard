@@ -17,6 +17,9 @@ owltokenguard, published as `@restingowlorg/owltokenguard`, gives your backend a
 - **Prerelease tag:** `next`
 - **Install:** `npm install @restingowlorg/owltokenguard`
 - **Developer guide:** [docs/DEVELOPER_GUIDE.md](docs/DEVELOPER_GUIDE.md)
+- **Security model:** [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md)
+- **Security policy:** [SECURITY.md](SECURITY.md)
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## What You Get
 
@@ -34,7 +37,7 @@ owltokenguard, published as `@restingowlorg/owltokenguard`, gives your backend a
 
 | Area               | Current Support                          |
 | ------------------ | ---------------------------------------- |
-| Runtime            | Node.js 18+                              |
+| Runtime            | Node.js 18, 20, and 22                   |
 | Language           | TypeScript, JavaScript                   |
 | Module output      | CommonJS                                 |
 | Signing algorithms | HS256, HS512, RS256, ES256               |
@@ -433,6 +436,10 @@ The table above covers what this library actually does. It's **not** an OWASP ce
 - CSRF defenses where cookies carry tokens
 - account recovery and MFA flows
 - authorization and role enforcement beyond token verification
+
+For the complete threat model, trust boundaries, and OWASP mapping, see
+[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md). To report a vulnerability,
+follow [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
