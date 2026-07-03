@@ -77,31 +77,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Detect release-ready package
-        id: package_state
-        shell: bash
-        run: |
-          if node -e 'const pkg=require("./package.json"); process.exit(pkg.name === "@restingowlorg/owltokenguard" && Boolean(pkg.devDependencies?.["@secretlint/quick-start"]) ? 0 : 1)'; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "OwlTokenGuard security tooling is not present yet; skipping bootstrap security checks."
-          fi
-
       - name: Setup Node.js
-        if: steps.package_state.outputs.ready == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: 22.x
 
       - name: Install dependencies
-        if: steps.package_state.outputs.ready == 'true'
         run: npm ci
 
       - name: Secret scan tracked files
-        if: steps.package_state.outputs.ready == 'true'
         run: git ls-files -z | xargs -0 npx secretlint
 
       - name: Dependency vulnerability audit
-        if: steps.package_state.outputs.ready == 'true'
         run: npm audit --omit=dev --audit-level=high
