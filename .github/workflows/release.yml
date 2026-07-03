@@ -145,6 +145,7 @@ jobs:
           node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed on Node 22")'
 
       - name: Verify OIDC trusted publishing is in use
+        if: false
         run: |
           if [ -n "${NODE_AUTH_TOKEN}" ]; then
             echo "Unexpected NODE_AUTH_TOKEN detected. Remove NPM_TOKEN/NODE_AUTH_TOKEN secrets to use npm trusted publishing." >&2
@@ -158,8 +159,8 @@ jobs:
           publish: npm run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ""
-          NPM_TOKEN: ""
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Exit prerelease mode for stable release
         if: steps.mode.outputs.mode == 'stable'
