@@ -1,0 +1,107 @@
+name: Security
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - develop
+      - staging
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check dependency review availability
+        id: dep_review_support
+        uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const { data: repo } = await github.rest.repos.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo
+              });
+
+              const security = repo.security_and_analysis || {};
+              const dependencyGraph = security.dependency_graph?.status === 'enabled';
+              const advancedSecurity = security.advanced_security?.status === 'enabled';
+              const supported = dependencyGraph && (!repo.private || advancedSecurity);
+
+              core.setOutput('supported', supported ? 'true' : 'false');
+
+              if (!supported) {
+                core.notice(
+                  `Skipping dependency review: dependency_graph=${dependencyGraph}, ` +
+                  `advanced_security=${advancedSecurity}, private_repo=${repo.private}`
+                );
+              }
+            } catch (error) {
+              core.notice(`Skipping dependency review: could not verify repository security settings (${error.message}).`);
+              core.setOutput('supported', 'false');
+            }
+
+      - name: Review dependency changes
+        if: ${{ steps.dep_review_support.outputs.supported == 'true' }}
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      - name: Dependency review skipped
+        if: ${{ steps.dep_review_support.outputs.supported != 'true' }}
+        run: echo "Dependency review is not available for this repository/token context. Skipping without failing the workflow."
+
+  runtime-security:
+    name: Secret Scan and Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect release-ready package
+        id: package_state
+        shell: bash
+        run: |
+          if node -e 'const pkg=require("./package.json"); process.exit(pkg.name === "@restingowlorg/owltokenguard" && Boolean(pkg.devDependencies?.["@secretlint/quick-start"]) ? 0 : 1)'; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "OwlTokenGuard security tooling is not present yet; skipping bootstrap security checks."
+          fi
+
+      - name: Setup Node.js
+        if: steps.package_state.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install dependencies
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Secret scan tracked files
+        if: steps.package_state.outputs.ready == 'true'
+        run: git ls-files -z | xargs -0 npx secretlint
+
+      - name: Dependency vulnerability audit
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm audit --omit=dev --audit-level=high
