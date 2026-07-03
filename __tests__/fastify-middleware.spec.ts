@@ -120,6 +120,25 @@ describe("fastifyVerifyToken middleware", () => {
     });
   });
 
+  it("should reject a refresh JWT on access-protected routes", async () => {
+    const refreshManager = createTokenManager({
+      ...managerConfig,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
+    });
+    const issued = await refreshManager.generateAccessToken({
+      sub: "refresh-user",
+    });
+
+    const response = await supertest(app.server)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.refreshToken}`)
+      .expect(401);
+
+    expect(response.body.error).toBe("Unauthorized");
+    expect(response.body.message).toMatch(/access token/i);
+  });
+
   it("should support validateTokenPreHandler alias", async () => {
     const aliasApp = await createTestApp(validateTokenPreHandler(manager));
     const issued = await manager.generateAccessToken({ sub: "alias-user" });

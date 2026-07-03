@@ -3,7 +3,7 @@ import { TokenRotator } from "./TokenRotator";
 import { TokenTerminator } from "./TokenTerminator";
 import { TokenVerifier } from "./TokenVerifier";
 import type { TokenConfig } from "../config/types";
-import { validateConfig } from "../config/validation";
+import { normalizeConfig, validateConfig } from "../config/validation";
 import type {
   TokenPayload,
   GenerateOptions,
@@ -59,8 +59,9 @@ export class TokenManager {
       terminator?: TokenTerminator;
     },
   ): TokenManager {
-    validateConfig(config);
-    return new TokenManager(config, dependencies);
+    const normalizedConfig = normalizeConfig(config);
+    validateConfig(normalizedConfig);
+    return new TokenManager(normalizedConfig, dependencies);
   }
 
   async generateAccessToken(

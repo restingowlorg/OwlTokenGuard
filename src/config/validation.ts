@@ -1,24 +1,41 @@
+import { createPublicKey } from "crypto";
 import type { TokenConfig } from "./types";
 import type { SigningAlgorithm } from "../security/AlgorithmGuard";
-import { AlgorithmGuard } from "../security/AlgorithmGuard";
+import { AlgorithmGuard, ES256_NAMED_CURVE } from "../security/AlgorithmGuard";
 import { SecretValidator } from "../security/SecretValidator";
 import { SecurityConfigurationError } from "../errors/SecurityConfigurationError";
 import { defaults } from "./defaults";
 
+function isHmacAlgorithm(
+  algorithm: SigningAlgorithm,
+): algorithm is "HS256" | "HS512" {
+  return algorithm === "HS256" || algorithm === "HS512";
+}
+
+/**
+ * Resolve defaulted configuration once so issuer, verifier, and validation
+ * all operate on the same effective security policy.
+ */
+export function normalizeConfig(config: TokenConfig): TokenConfig {
+  const algorithm = config.algorithm ?? defaults.algorithm;
+
+  return {
+    ...config,
+    algorithm,
+    allowedAlgorithms: config.allowedAlgorithms ?? [algorithm],
+  };
+}
+
 /** Story 1.1: fail-fast config validation at startup. */
 export function validateConfig(config: TokenConfig): void {
   validatePositiveIntegerSeconds(config.expiresInSeconds, "expiresInSeconds");
+  validateIssuer(config.issuer);
+  validateAudience(config.audience);
 
   const algorithm = config.algorithm ?? defaults.algorithm;
   AlgorithmGuard.assertAllowed(algorithm);
 
-  if (config.hmacSecret !== undefined) {
-    validateHmacSecret(config.hmacSecret, algorithm);
-  }
-
-  if (config.signingKey !== undefined) {
-    validateAlgorithm(algorithm, config.signingKey);
-  }
+  validateRequiredKeyMaterial(config, algorithm);
 
   if (config.refreshTokenEnabled) {
     if (config.refreshTokenExpiresInSeconds === undefined) {
@@ -30,6 +47,130 @@ export function validateConfig(config: TokenConfig): void {
       config.refreshTokenExpiresInSeconds,
       "refreshTokenExpiresInSeconds",
     );
+  }
+}
+
+function validateIssuer(issuer: unknown): void {
+  if (issuer === undefined) {
+    return;
+  }
+
+  if (typeof issuer !== "string" || issuer.trim().length === 0) {
+    throw new SecurityConfigurationError(
+      "issuer must be a non-empty string when configured",
+    );
+  }
+}
+
+function validateAudience(audience: unknown): void {
+  if (audience === undefined) {
+    return;
+  }
+
+  if (typeof audience === "string") {
+    if (audience.trim().length === 0) {
+      throw new SecurityConfigurationError(
+        "audience must be a non-empty string when configured",
+      );
+    }
+    return;
+  }
+
+  if (
+    !Array.isArray(audience) ||
+    audience.length === 0 ||
+    audience.some(
+      (value) => typeof value !== "string" || value.trim().length === 0,
+    )
+  ) {
+    throw new SecurityConfigurationError(
+      "audience must be a non-empty string or array of non-empty strings",
+    );
+  }
+}
+
+function validateRequiredKeyMaterial(
+  config: TokenConfig,
+  algorithm: SigningAlgorithm,
+): void {
+  if (isHmacAlgorithm(algorithm)) {
+    if (config.hmacSecret === undefined && config.signingKey === undefined) {
+      throw new SecurityConfigurationError(
+        "HMAC secret is required for HS256/HS512",
+      );
+    }
+
+    if (config.hmacSecret !== undefined) {
+      validateHmacSecret(config.hmacSecret, algorithm);
+    }
+
+    if (config.signingKey !== undefined) {
+      validateAlgorithm(algorithm, config.signingKey);
+    }
+    return;
+  }
+
+  if (config.hmacSecret !== undefined) {
+    throw new SecurityConfigurationError(
+      `HMAC secret cannot be used with asymmetric algorithm "${algorithm}"`,
+    );
+  }
+
+  if (config.signingKey === undefined) {
+    throw new SecurityConfigurationError(
+      `Asymmetric signing key is required for ${algorithm}`,
+    );
+  }
+
+  validateAlgorithm(algorithm, config.signingKey);
+
+  if (config.signingKey.type !== "asymmetric") {
+    throw new SecurityConfigurationError(
+      `Asymmetric signing key is required for ${algorithm}`,
+    );
+  }
+
+  validatePublicKey(algorithm, config.signingKey.publicKey);
+}
+
+function validatePublicKey(
+  algorithm: SigningAlgorithm,
+  publicKeyPem: unknown,
+): void {
+  if (typeof publicKeyPem !== "string" || publicKeyPem.length === 0) {
+    throw new SecurityConfigurationError(
+      `Public key is required for ${algorithm} verification`,
+    );
+  }
+
+  try {
+    const publicKey = createPublicKey(publicKeyPem);
+
+    if (algorithm === "RS256" && publicKey.asymmetricKeyType !== "rsa") {
+      throw new SecurityConfigurationError(
+        "RS256 verification requires an RSA public key",
+      );
+    }
+
+    if (algorithm === "ES256") {
+      if (publicKey.asymmetricKeyType !== "ec") {
+        throw new SecurityConfigurationError(
+          "ES256 verification requires an EC public key",
+        );
+      }
+
+      const namedCurve = publicKey.asymmetricKeyDetails?.namedCurve;
+      if (namedCurve !== ES256_NAMED_CURVE) {
+        throw new SecurityConfigurationError(
+          `ES256 verification requires the ${ES256_NAMED_CURVE} curve (P-256)`,
+        );
+      }
+    }
+  } catch (error) {
+    if (error instanceof SecurityConfigurationError) {
+      throw error;
+    }
+    throw new SecurityConfigurationError("Invalid public key PEM");
   }
 }
 

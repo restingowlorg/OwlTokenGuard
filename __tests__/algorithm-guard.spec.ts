@@ -30,31 +30,34 @@ describe("AlgorithmGuard", () => {
   });
 
   it("should prevent key confusion between symmetric and asymmetric algorithms", () => {
-    const { privateKey } = generateRsaKeyPair();
+    const { privateKey, publicKey } = generateRsaKeyPair();
     expect(() =>
       AlgorithmGuard.validateAlgorithm("HS256", {
         type: "asymmetric",
         privateKey,
+        publicKey,
       }),
     ).toThrow(SecurityConfigurationError);
   });
 
   it("should accept P-256 EC keys for ES256 signing", () => {
-    const { privateKey } = generateEcKeyPair();
+    const { privateKey, publicKey } = generateEcKeyPair();
     expect(() =>
       AlgorithmGuard.validateAlgorithm("ES256", {
         type: "asymmetric",
         privateKey,
+        publicKey,
       }),
     ).not.toThrow();
   });
 
   it("should reject non-P-256 EC keys for ES256 signing", () => {
-    const { privateKey } = generateNonP256EcKeyPair();
+    const { privateKey, publicKey } = generateNonP256EcKeyPair();
     expect(() =>
       AlgorithmGuard.validateAlgorithm("ES256", {
         type: "asymmetric",
         privateKey,
+        publicKey,
       }),
     ).toThrow(/prime256v1/i);
   });

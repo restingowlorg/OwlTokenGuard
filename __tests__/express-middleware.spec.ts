@@ -42,8 +42,14 @@ function createTestApp(
 
 describe("expressVerifyToken middleware", () => {
   const manager = createTokenManager(managerConfig);
-  const auth = expressVerifyToken(manager, { purpose: "access" });
-  const app = createTestApp("/api", auth);
+  let app: Express;
+
+  beforeEach(() => {
+    app = createTestApp(
+      "/api",
+      expressVerifyToken(manager, { purpose: "access" }),
+    );
+  });
 
   it("should allow public routes without a token", async () => {
     const response = await request(app).get("/public").expect(200);
@@ -108,6 +114,25 @@ describe("expressVerifyToken middleware", () => {
       sub: "user-42",
       jti: issued.claims.jti,
     });
+  });
+
+  it("should reject a refresh JWT on access-protected routes", async () => {
+    const refreshManager = createTokenManager({
+      ...managerConfig,
+      refreshTokenEnabled: true,
+      refreshTokenExpiresInSeconds: 3600,
+    });
+    const issued = await refreshManager.generateAccessToken({
+      sub: "refresh-user",
+    });
+
+    const response = await request(app)
+      .get("/api/profile")
+      .set("Authorization", `Bearer ${issued.refreshToken}`)
+      .expect(401);
+
+    expect(response.body.error).toBe("Unauthorized");
+    expect(response.body.message).toMatch(/access token/i);
   });
 
   it("should support validateTokenMiddleware alias", async () => {

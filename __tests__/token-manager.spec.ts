@@ -24,11 +24,11 @@ describe("TokenManager.generateAccessToken", () => {
   });
 
   it("should issue an RS256 JWT with asymmetric keys", async () => {
-    const { privateKey } = generateRsaKeyPair();
+    const { privateKey, publicKey } = generateRsaKeyPair();
     const manager = createTokenManager({
       ...requiredTestHooks,
       algorithm: "RS256",
-      signingKey: { type: "asymmetric", privateKey },
+      signingKey: { type: "asymmetric", privateKey, publicKey },
       expiresInSeconds: 3600,
     });
 

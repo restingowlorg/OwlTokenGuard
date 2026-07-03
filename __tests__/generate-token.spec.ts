@@ -68,12 +68,12 @@ describe("generate token (usage)", () => {
 
   describe("RS256 asymmetric (preferred default)", () => {
     it("should generate a signed JWT with an RSA private key", async () => {
-      const { privateKey } = generateRsaKeyPair();
+      const { privateKey, publicKey } = generateRsaKeyPair();
 
       const manager = createTokenManager({
         ...requiredTestHooks,
         algorithm: "RS256",
-        signingKey: { type: "asymmetric", privateKey },
+        signingKey: { type: "asymmetric", privateKey, publicKey },
         expiresInSeconds: 3600,
       });
 
