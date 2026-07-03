@@ -1,9 +1,9 @@
 # Integration Boundary
 
-This document defines the responsibility split between `owltokenguard` and
+This document defines the responsibility split between OwlTokenGuard and
 OwlSessionGuard.
 
-`owltokenguard` is responsible for token construction and token validation. It
+OwlTokenGuard is responsible for token construction and token validation. It
 signs JWTs, verifies JWTs, validates algorithm and key material, stamps and
 checks registered claims, enforces token purpose, optionally encrypts application
 payloads, and exposes token-safe lookup primitives such as digests.
@@ -13,13 +13,13 @@ records, refresh-token rotation state, replay handling, idle timeout, absolute
 session lifetime, device binding, logout-all-devices, breach response, and
 storage adapters.
 
-The practical rule is simple: `owltokenguard` can tell whether a token is
+The practical rule is simple: OwlTokenGuard can tell whether a token is
 cryptographically valid and intended for a purpose. OwlSessionGuard decides
 whether the session behind that token is still active.
 
 ## Refresh Tokens
 
-`owltokenguard` may issue and verify refresh JWTs, but it does not store refresh
+OwlTokenGuard may issue and verify refresh JWTs, but it does not store refresh
 token state. Refresh-token state must live in OwlSessionGuard or in an
 application-owned store.
 
@@ -44,7 +44,7 @@ form when the digest is persisted in a database.
 
 ## Responsibility Split
 
-### owltokenguard owns
+### OwlTokenGuard owns
 
 - JWT signing for access, ID-style, and refresh tokens.
 - JWT verification with signature-first validation.
@@ -76,7 +76,7 @@ form when the digest is persisted in a database.
 A typical protected request should follow this sequence:
 
 1. Middleware extracts the bearer token.
-2. `owltokenguard` verifies the token signature, algorithm, issuer, audience,
+2. OwlTokenGuard verifies the token signature, algorithm, issuer, audience,
    temporal claims, and purpose.
 3. Application code or OwlSessionGuard checks session state using the verified
    `sub`, `jti`, `iat`, `exp`, and any stored cutoff/revocation records.
@@ -85,7 +85,7 @@ A typical protected request should follow this sequence:
 Do not use decoded JWT payloads directly for authorization. Only use the result
 returned by `verify()` or by framework middleware after successful verification.
 
-## Out of Scope for owltokenguard
+## Out of Scope for OwlTokenGuard
 
 The following features should not be implemented inside this package:
 

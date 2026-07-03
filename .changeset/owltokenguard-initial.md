@@ -1,5 +1,5 @@
 ---
-"@restingowlorg/owltokenguard": minor
+"@restingowlorg/owltokenguard": major
 ---
 
 Establish OwlTokenGuard as the public package identity and add the release

@@ -1,6 +1,6 @@
 # Security Model
 
-`owltokenguard` is the token management library in the Resting Owl package
+OwlTokenGuard is the token management library in the Resting Owl package
 family. It provides cryptographic token issuance, verification, payload
 encryption, token purpose enforcement, middleware verification helpers, and safe
 token digest primitives for Node.js applications.
@@ -34,7 +34,7 @@ to OwlSessionGuard or to the consuming application.
 
 ## Trust Boundaries
 
-`owltokenguard` trusts only configuration supplied by the application at
+OwlTokenGuard trusts only configuration supplied by the application at
 startup: signing keys, HMAC secrets, allowed algorithms, issuer, audience,
 trusted key-source domains, and integration callbacks.
 
@@ -59,7 +59,7 @@ must fail shut before claims are trusted by application code.
 
 ## OWASP Mapping
 
-| Area                       | owltokenguard behavior                                                                     | OWASP reference                                                          |
+| Area                       | OwlTokenGuard behavior                                                                     | OWASP reference                                                          |
 | -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | JWT signature validation   | Verifies signatures before returning trusted payloads.                                     | OWASP JWT Cheat Sheet: validate token integrity.                         |
 | Algorithm allowlisting     | Allows only supported configured algorithms and rejects `none`.                            | OWASP JWT Cheat Sheet: prevent none-algorithm and confusion attacks.     |
@@ -74,7 +74,7 @@ must fail shut before claims are trusted by application code.
 
 ## Integration With OwlSessionGuard
 
-Use owltokenguard for token cryptography and verification. Use OwlSessionGuard
+Use OwlTokenGuard for token cryptography and verification. Use OwlSessionGuard
 for durable session lifecycle state:
 
 - Active session records.
