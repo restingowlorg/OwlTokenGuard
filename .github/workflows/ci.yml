@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    branches:
+      - develop
+      - staging
+      - main
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pr-checks:
+    name: PR Checks (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - 18.x
+          - 20.x
+          - 22.x
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect release-ready package
+        id: package_state
+        shell: bash
+        run: |
+          if node -e 'const pkg=require("./package.json"); process.exit(pkg.name === "@restingowlorg/owltokenguard" && Boolean(pkg.scripts?.["release:validate"]) ? 0 : 1)'; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "OwlTokenGuard release scripts are not present yet; skipping bootstrap CI checks."
+          fi
+
+      - name: Setup Node.js
+        if: steps.package_state.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Check formatting
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm run format:check
+
+      - name: Detect merge conflict markers
+        if: steps.package_state.outputs.ready == 'true'
+        run: |
+          if git grep -nE '^(<<<<<<< |=======$|>>>>>>> )' -- . ':!package-lock.json' ':!LICENSE'; then
+            echo "Merge conflict markers detected. Resolve them before merge."
+            exit 1
+          fi
+
+      - name: Lint code
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm run lint -- --max-warnings=0
+
+      - name: Type check
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm run typecheck
+
+      - name: Build library
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm run build
+
+      - name: Run tests
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm test
+
+      - name: Run coverage gate
+        if: steps.package_state.outputs.ready == 'true'
+        run: npm run test:coverage
