@@ -1,0 +1,7 @@
+dist
+node_modules
+coverage
+package-lock.json
+CHANGELOG.md
+docs/BACKLOG.md
+docs/ossec-cryptography-library-release-readiness.md
