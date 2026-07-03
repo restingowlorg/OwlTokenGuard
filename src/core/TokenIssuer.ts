@@ -14,10 +14,7 @@ import type {
 import { REAUTH_AT_CLAIM } from "./types";
 import { ReferenceTokenGenerator } from "../generators/ReferenceTokenGenerator";
 import { resolveSigningMaterial, signJwt } from "../jwt/JwtSigner";
-import {
-  AlgorithmGuard,
-  type SigningAlgorithm,
-} from "../security/AlgorithmGuard";
+import { AlgorithmGuard } from "../security/AlgorithmGuard";
 import { TokenGenerationError } from "../errors/TokenGenerationError";
 import { DefaultLogger, type ILogger } from "../utils/Logger";
 import type { TokenTerminator } from "./TokenTerminator";
@@ -90,13 +87,10 @@ export class TokenIssuer {
       standardClaims.reauth_at = reauthAt;
     }
 
-    const signingMaterial = resolveSigningMaterial(
-      algorithm as SigningAlgorithm,
-      {
-        hmacSecret: this.config.hmacSecret,
-        signingKey: this.config.signingKey,
-      },
-    );
+    const signingMaterial = resolveSigningMaterial(algorithm, {
+      hmacSecret: this.config.hmacSecret,
+      signingKey: this.config.signingKey,
+    });
 
     const result: AccessTokenResult = {
       token: signJwt(jwtPayload, signingMaterial),

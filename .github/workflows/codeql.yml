@@ -25,7 +25,8 @@ concurrency:
 permissions:
   actions: read
   contents: read
-  security-events: write
+  # Uncomment the following line once the repository becomes public
+  # security-events: write
 
 jobs:
   analyze:
@@ -52,5 +53,6 @@ jobs:
 
       - name: Perform CodeQL Analysis (no upload)
         uses: github/codeql-action/analyze@v4
+        # Change this from false to true once the repository becomes public
         with:
           upload: false

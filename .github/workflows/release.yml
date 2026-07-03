@@ -39,7 +39,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.x
+          node-version: 22.x
           cache: npm
 
       - name: Determine release mode
@@ -89,14 +89,47 @@ jobs:
       - name: Create npm package artifact
         run: npm pack --json > pack-output.json
 
-      - name: Smoke test npm package artifact
+      - name: Smoke test npm package artifact on Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Smoke test npm package artifact on Node 18
         run: |
           PACK_FILE=$(node -e 'const fs=require("fs");const out=JSON.parse(fs.readFileSync("pack-output.json","utf8"));process.stdout.write(out[0].filename)')
           TMP_DIR=$(mktemp -d)
           cd "$TMP_DIR"
           npm init -y >/dev/null 2>&1
           npm install "$GITHUB_WORKSPACE/$PACK_FILE"
-          node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed")'
+          node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed on Node 18")'
+
+      - name: Smoke test npm package artifact on Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+
+      - name: Smoke test npm package artifact on Node 20
+        run: |
+          PACK_FILE=$(node -e 'const fs=require("fs");const out=JSON.parse(fs.readFileSync("pack-output.json","utf8"));process.stdout.write(out[0].filename)')
+          TMP_DIR=$(mktemp -d)
+          cd "$TMP_DIR"
+          npm init -y >/dev/null 2>&1
+          npm install "$GITHUB_WORKSPACE/$PACK_FILE"
+          node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed on Node 20")'
+
+      - name: Restore trusted publishing Node runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Smoke test npm package artifact on Node 22
+        run: |
+          PACK_FILE=$(node -e 'const fs=require("fs");const out=JSON.parse(fs.readFileSync("pack-output.json","utf8"));process.stdout.write(out[0].filename)')
+          TMP_DIR=$(mktemp -d)
+          cd "$TMP_DIR"
+          npm init -y >/dev/null 2>&1
+          npm install "$GITHUB_WORKSPACE/$PACK_FILE"
+          node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed on Node 22")'
 
       - name: Enter prerelease mode and version packages
         if: steps.mode.outputs.mode == 'prerelease'

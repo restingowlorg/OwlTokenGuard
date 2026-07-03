@@ -101,15 +101,15 @@ export function verifyJwtSignatureFirst(
   }
 
   AlgorithmGuard.assertAllowed(alg);
-  assertAlgorithmPermitted(alg as SigningAlgorithm, config);
+  assertAlgorithmPermitted(alg, config);
 
   TrustedKeySourceGuard.assertTrustedHeaders(
     header,
     config.trustedKeySourceDomains,
   );
 
-  const material = resolveVerificationMaterial(alg as SigningAlgorithm, config);
-  assertKeyConfusionProtection(alg as SigningAlgorithm, material);
+  const material = resolveVerificationMaterial(alg, config);
+  assertKeyConfusionProtection(alg, material);
 
   const signature = Buffer.from(signatureSegment, "base64url");
   if (!verifySignature(signingInput, signature, material)) {
