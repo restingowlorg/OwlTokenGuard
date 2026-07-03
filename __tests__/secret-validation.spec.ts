@@ -20,4 +20,13 @@ describe("SecretValidator", () => {
       SecretValidator.validateHmacSecret(TEST_HMAC_SECRET),
     ).not.toThrow();
   });
+
+  it("should expose a direct high-entropy assertion helper", () => {
+    expect(() =>
+      SecretValidator.assertHighEntropy(TEST_HMAC_SECRET),
+    ).not.toThrow();
+    expect(() => SecretValidator.assertHighEntropy("a".repeat(64))).toThrow(
+      SecurityConfigurationError,
+    );
+  });
 });

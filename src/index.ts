@@ -3,6 +3,7 @@ export type { TokenManager } from "./core/TokenManager";
 export { ReferenceTokenGenerator } from "./generators/ReferenceTokenGenerator";
 export { Aes256GcmCipher } from "./ciphering/Aes256GcmCipher";
 export { validateToken } from "./validation/validateToken";
+export { createTokenDigest } from "./utils/TokenDigest";
 export {
   expressVerifyToken,
   validateTokenMiddleware,

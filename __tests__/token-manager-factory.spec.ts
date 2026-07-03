@@ -170,6 +170,26 @@ describe("createTokenManager", () => {
     ).toThrow(/audience must be a non-empty string/i);
   });
 
+  it.each([
+    ["onSessionTerminate", undefined],
+    ["onSessionTerminate", "not-a-function"],
+    ["onRefreshTokenIssued", "not-a-function"],
+    ["consumeRefreshToken", "not-a-function"],
+    ["getTokensInvalidBefore", "not-a-function"],
+    ["getMinimumReauthAt", "not-a-function"],
+    ["isSessionRevoked", "not-a-function"],
+  ])("should reject invalid callback field %s", (fieldName, value) => {
+    expect(() =>
+      createTokenManager({
+        ...requiredTestHooks,
+        [fieldName]: value,
+        algorithm: "HS256",
+        hmacSecret: TEST_HMAC_SECRET,
+        expiresInSeconds: 3600,
+      }),
+    ).toThrow(new RegExp(`${fieldName} must be a function`, "i"));
+  });
+
   it.each([0, -1, NaN, Infinity, 1.5])(
     "should reject invalid expiresInSeconds at startup (%p)",
     (expiresInSeconds) => {
