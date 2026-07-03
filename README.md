@@ -1,16 +1,16 @@
-# owltokenguard
+# OwlTokenGuard
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/restingowlorg/OwlAuth/main/docs/assets/restingowl-logo.png" alt="owltokenguard logo" width="320" />
+  <img src="https://raw.githubusercontent.com/restingowlorg/OwlAuth/main/docs/assets/restingowl-logo.png" alt="OwlTokenGuard logo" width="320" />
 </p>
 
 ---
 
 [![npm package](https://img.shields.io/badge/npm-%40restingowlorg%2Fowltokenguard-CB3837?style=flat-square&logo=npm&logoColor=white)](https://www.npmjs.com/package/@restingowlorg/owltokenguard) [![Node.js](https://img.shields.io/badge/node-%3E%3D18-339933?style=flat-square&logo=node.js&logoColor=white)](https://www.npmjs.com/package/@restingowlorg/owltokenguard) [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-Open-source OWASP-aligned token and session security library for Node.js.
+Open-source OWASP-aligned token management library for Node.js.
 
-owltokenguard, published as `@restingowlorg/owltokenguard`, gives your backend a focused token-management surface: access and refresh JWT issuance, signature-first verification, refresh-token rotation (RTR), session revocation, and freshness controls after account-security events. It ships Express and Fastify middleware and stays out of your persistence layer — you wire hooks for refresh storage and session termination.
+OwlTokenGuard, published as `@restingowlorg/owltokenguard`, gives your backend a focused token-management surface: access and refresh JWT issuance, signature-first verification, refresh-token rotation (RTR), session revocation, and freshness controls after account-security events. It ships Express and Fastify middleware and stays out of your persistence layer — you wire hooks for refresh storage and session termination.
 
 - **Package:** `@restingowlorg/owltokenguard`
 - **Latest stable tag:** `latest`
@@ -81,13 +81,13 @@ console.log(verified.payload.sub); // "user-123"
 
 ## Package Boundary
 
-owltokenguard is the token management library. It owns token-level cryptography: JWT signing, verification, registered claims such as `iss` and `aud`, token purpose checks, optional payload encryption, and opaque reference-token generation. OwlSessionGuard is the session management library and owns session records, storage adapters, idle and absolute timeouts, revoke-all behavior, device binding, breach response, and persistent refresh-token rotation state.
+OwlTokenGuard is the token management library. It owns token-level cryptography: JWT signing, verification, registered claims such as `iss` and `aud`, token purpose checks, optional payload encryption, and opaque reference-token generation. OwlSessionGuard is the session management library and owns session records, storage adapters, idle and absolute timeouts, revoke-all behavior, device binding, breach response, and persistent refresh-token rotation state.
 
 The refresh APIs in this package issue and validate refresh JWTs and expose hooks such as `onRefreshTokenIssued`, `consumeRefreshToken`, and `onSessionTerminate` as integration points. Back those hooks with the session-management library or an application-owned store; this package does not own durable session storage.
 
 ## Signing & Key Material
 
-owltokenguard defaults to **RS256** at the library level; HS256/HS512 require a high-entropy HMAC secret (minimum 64 characters). ES256 requires the **P-256 / `prime256v1`** curve; RS256 verification rejects keys below **2048 bits**.
+OwlTokenGuard defaults to **RS256** at the library level; HS256/HS512 require a high-entropy HMAC secret (minimum 64 characters). ES256 requires the **P-256 / `prime256v1`** curve; RS256 verification rejects keys below **2048 bits**.
 
 ### Symmetric (HS256 / HS512)
 
@@ -394,7 +394,7 @@ try {
 
 ## OWASP Alignment
 
-Here's what owltokenguard enforces in code, traced to [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html), [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), and [ASVS](https://owasp.org/www-project-application-security-verification-standard/) token/session controls.
+Here's what OwlTokenGuard enforces in code, traced to [OWASP JWT Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html), [Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html), and [ASVS](https://owasp.org/www-project-application-security-verification-standard/) token/session controls.
 
 ### Token Verification
 
@@ -443,14 +443,14 @@ follow [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
-owltokenguard is part of the wider Resting Owl effort to ship secure-by-default tooling for Node.js backends.
+OwlTokenGuard is part of the wider Resting Owl effort to ship secure-by-default tooling for Node.js backends.
 
 What's coming next:
 
 - **Deeper framework integrations:** First-party helpers for NestJS, Next.js API routes, and serverless runtimes
 - **JWKS & key rotation:** Built-in JWKS fetch/rotation patterns for multi-tenant issuers
 - **Stronger session stores:** Reference adapters and patterns for Redis, PostgreSQL, and MongoDB session persistence
-- **Tighter owlauth pairing:** End-to-end examples combining `@restingowlorg/owlauth` login flows with owltokenguard session tokens
+- **Tighter owlauth pairing:** End-to-end examples combining `@restingowlorg/owlauth` login flows with OwlTokenGuard tokens
 - **Broader Resting Owl package family:** Adjacent packages for rate limiting, audit logging, CSRF protection, and secrets management
 
 ## Releases

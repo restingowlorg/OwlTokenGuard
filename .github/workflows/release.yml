@@ -83,6 +83,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Enter prerelease mode and version packages
+        if: steps.mode.outputs.mode == 'prerelease'
+        run: |
+          if [ ! -f ".changeset/pre.json" ]; then
+            npx changeset pre enter next
+          fi
+          npm run version-packages
+
       - name: Validate release quality gates
         run: npm run release:validate
 
@@ -130,14 +138,6 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm install "$GITHUB_WORKSPACE/$PACK_FILE"
           node -e 'require("@restingowlorg/owltokenguard"); console.log("artifact smoke test passed on Node 22")'
-
-      - name: Enter prerelease mode and version packages
-        if: steps.mode.outputs.mode == 'prerelease'
-        run: |
-          if [ ! -f ".changeset/pre.json" ]; then
-            npx changeset pre enter next
-          fi
-          npm run version-packages
 
       - name: Verify OIDC trusted publishing is in use
         run: |
