@@ -1,8 +1,0 @@
-{
-  "mode": "pre",
-  "tag": "next",
-  "initialVersions": {
-    "@restingowlorg/owltokenguard": "0.0.0"
-  },
-  "changesets": ["owltokenguard-initial"]
-}
