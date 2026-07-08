@@ -1,5 +1,11 @@
 # @restingowlorg/owltokenguard
 
+## 1.0.0-next.1
+
+### Patch Changes
+
+- ddcb8dd: Update OwlTokenGuard documentation for release readiness.
+
 ## 1.0.0-next.0
 
 ### Major Changes
