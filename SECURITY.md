@@ -68,3 +68,9 @@ when a fix or coordinated disclosure needs more time.
 - Session lifecycle storage bugs owned by OwlSessionGuard or the consuming
   application.
 - Non-security bugs with no realistic security impact.
+
+## Security Architecture
+
+For the technical security boundary, threat model assumptions, control mapping,
+and operational limits of this library, see
+`docs/SECURITY_MODEL.md`.
