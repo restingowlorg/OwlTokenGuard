@@ -28,6 +28,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"__tests__/**/*.ts\" \"docs/**/*.md\" \"*.{json,md}\"",
     "changeset": "changeset",
     "version-packages": "changeset version",
+    "version-packages:stable": "if [ -f .changeset/pre.json ]; then changeset pre exit; fi && changeset version",
     "release": "changeset publish",
     "release:validate": "npm run format:check && npm run lint -- --max-warnings=0 && npm run typecheck && npm run build && npm run test:coverage",
     "prepare": "is-ci || husky",
