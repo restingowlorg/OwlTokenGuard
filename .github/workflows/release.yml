@@ -161,22 +161,11 @@ jobs:
           NODE_AUTH_TOKEN: ""
           NPM_TOKEN: ""
 
-      - name: Exit prerelease mode for stable release
-        if: steps.mode.outputs.mode == 'stable'
-        run: |
-          if [ -f ".changeset/pre.json" ]; then
-            npx changeset pre exit
-          fi
-
       - name: Create release pull request or publish
         if: steps.mode.outputs.mode == 'stable'
         uses: changesets/action@v1
         with:
-          version: |
-            if [ -f ".changeset/pre.json" ]; then
-              npx changeset pre exit
-            fi
-            npm run version-packages
+          version: npm run version-packages:stable
           publish: npm run release
           title: "chore(release): version packages"
           commit: "chore(release): version packages"
