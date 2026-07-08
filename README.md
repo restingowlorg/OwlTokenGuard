@@ -437,7 +437,7 @@ The table above covers what this library actually does. It's **not** an OWASP ce
 - account recovery and MFA flows
 - authorization and role enforcement beyond token verification
 
-For the complete threat model, trust boundaries, and OWASP mapping, see
+For technical boundaries and threat model details, see
 [docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md). To report a vulnerability,
 follow [SECURITY.md](SECURITY.md).
 
@@ -452,15 +452,6 @@ What's coming next:
 - **Stronger session stores:** Reference adapters and patterns for Redis, PostgreSQL, and MongoDB session persistence
 - **Tighter owlauth pairing:** End-to-end examples combining `@restingowlorg/owlauth` login flows with OwlTokenGuard tokens
 - **Broader Resting Owl package family:** Adjacent packages for rate limiting, audit logging, CSRF protection, and secrets management
-
-## Releases
-
-Releases use [Changesets](https://github.com/changesets/changesets) with `develop` → `staging` → `main` promotion and npm dist-tags `next` / `latest`. See [docs/RELEASE_DAY_RUNBOOK.md](docs/RELEASE_DAY_RUNBOOK.md) and [docs/DETAILED_RELEASE_SYNC_RUNBOOK.md](docs/DETAILED_RELEASE_SYNC_RUNBOOK.md).
-
-```bash
-npm run changeset          # record a user-facing change
-npm run release:validate   # local quality gates before opening a PR
-```
 
 ## Community
 
