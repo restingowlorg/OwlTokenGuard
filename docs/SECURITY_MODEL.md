@@ -1,107 +1,113 @@
 # Security Model
 
-OwlTokenGuard is the token management library in the Resting Owl package
-family. It provides cryptographic token issuance, verification, payload
-encryption, token purpose enforcement, middleware verification helpers, and safe
-token digest primitives for Node.js applications.
+This document defines the technical security model for
+`@restingowlorg/owltokenguard`.
 
-It does not replace application authorization, transport security, user
-authentication, or durable session storage. Session lifecycle behavior belongs
-to OwlSessionGuard or to the consuming application.
+It is separate from `SECURITY.md`:
+
+- `SECURITY.md` covers vulnerability reporting, response targets, and
+  disclosure workflow.
+- This document covers trust boundaries, technical controls, assumptions,
+  and limits.
+
+## Purpose
+
+OwlTokenGuard is the token security component in the Resting Owl library set.
+Its responsibility is token cryptography and token verification behavior for
+Node.js applications.
 
 ## Security Goals
 
-- Issue signed JWT access and refresh tokens with approved algorithms.
+- Issue signed access and refresh JWTs using approved algorithms.
 - Verify signatures before trusting payload claims.
-- Reject unsupported algorithms and the `none` algorithm.
-- Prevent symmetric/asymmetric key confusion.
-- Enforce issuer, audience, temporal claims, token purpose, and optional
-  freshness checks.
-- Keep encrypted application payloads confidential while preserving signed
-  security claims needed for verification.
-- Provide deterministic token digests so applications can avoid storing raw
-  bearer or refresh tokens.
-- Return generic public middleware errors by default.
+- Prevent algorithm downgrade and key-confusion classes of failures.
+- Enforce token intent with explicit purpose checks.
+- Support refresh-token rotation and termination integration points.
+- Support optional payload encryption with authenticated ciphering.
+- Provide digest helpers so integrations avoid storing raw bearer tokens.
 
 ## Non-Goals
 
-- User authentication flows such as password login, magic links, or MFA.
-- Application authorization and role decisions after token verification.
-- Persistent session storage, device binding, idle timeout, absolute session
-  lifetime, replay response, or revoke-all workflows.
-- Network transport protection. Applications must still require HTTPS.
-- Key management infrastructure, HSM integration, or automated JWKS rotation.
+- User authentication flows (password, magic-link, MFA, recovery).
+- Application authorization and role-policy decisions.
+- Durable session storage and device/session lifecycle policy.
+- Transport security controls such as TLS termination and network policy.
+- Key-management infrastructure (HSM, KMS lifecycle automation, JWKS ops).
 
 ## Trust Boundaries
 
-OwlTokenGuard trusts only configuration supplied by the application at
-startup: signing keys, HMAC secrets, allowed algorithms, issuer, audience,
-trusted key-source domains, and integration callbacks.
+Trusted inputs at startup:
 
-Incoming JWTs, request headers, bearer tokens, encrypted payloads, `jku` and
-`x5u` headers, and middleware request data are untrusted input. Verification
-must fail shut before claims are trusted by application code.
+- Key material and algorithm selection.
+- Issuer and audience policy configuration.
+- Verification allowlists and hook implementations.
 
-## Threat Model
+Untrusted runtime inputs:
 
-| Threat                              | Library control                                                                                  | Application responsibility                                     |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| Token tampering                     | Signature-first verification and strict JWT parsing.                                             | Never trust decoded claims without `verify()`.                 |
-| Algorithm downgrade or `none` usage | Algorithm allowlist and explicit `none` rejection.                                               | Configure a narrow `allowedAlgorithms` list.                   |
-| Key confusion                       | HMAC algorithms require symmetric keys; RS256/ES256 require asymmetric keys.                     | Keep public and private key material separated.                |
-| Weak HMAC secrets                   | HS256/HS512 secrets must be high entropy and at least 64 characters.                             | Store secrets in a secret manager and rotate when needed.      |
-| Weak asymmetric keys                | RS256 rejects RSA keys below 2048 bits; ES256 requires P-256.                                    | Generate and rotate keys with approved tooling.                |
-| Wrong-token use                     | `purpose` checks separate access, ID-style, and refresh JWTs.                                    | Protect API routes with the expected purpose.                  |
-| Bearer token theft                  | Short expirations, purpose checks, token digests, and generic middleware errors reduce exposure. | Use HTTPS, secure storage, CSRF controls, and revocation.      |
-| Refresh token replay                | `consumeRefreshToken` integration hook supports atomic one-time use.                             | Store rotation state in OwlSessionGuard or another safe store. |
-| Payload disclosure                  | Optional AES-256-GCM payload encryption hides application claims inside `enc`.                   | Protect encryption keys and avoid putting secrets in tokens.   |
-| Error probing                       | Middleware responses are generic by default.                                                     | Keep detailed auth failures in logs or private callbacks.      |
+- Incoming JWTs and token headers.
+- Request authorization headers.
+- Claims from client-controlled tokens before verification.
+- Any remote-key references supplied by token headers.
 
-## OWASP Mapping
+Rule: claims are not trusted until signature and configured verification checks
+complete successfully.
 
-| Area                       | OwlTokenGuard behavior                                                                     | OWASP reference                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| JWT signature validation   | Verifies signatures before returning trusted payloads.                                     | OWASP JWT Cheat Sheet: validate token integrity.                         |
-| Algorithm allowlisting     | Allows only supported configured algorithms and rejects `none`.                            | OWASP JWT Cheat Sheet: prevent none-algorithm and confusion attacks.     |
-| Temporal validation        | Enforces `exp`, `nbf`, `iat`, clock tolerance, and max token size.                         | OWASP JWT Cheat Sheet: validate registered claims and input size.        |
-| Issuer and audience        | Supports configured `iss`, `aud`, `trustedIssuers`, and per-call audience overrides.       | OWASP JWT Cheat Sheet: validate expected issuer and audience.            |
-| Token purpose separation   | Rejects refresh or ID-style tokens when access tokens are required.                        | OWASP ASVS token validation and OAuth/OIDC token use separation.         |
-| Refresh token rotation     | Provides cryptographic refresh JWTs and integration hooks for one-time rotation state.     | OWASP Session Management Cheat Sheet: detect and respond to token reuse. |
-| Server-side invalidation   | Exposes revocation, cutoff, and termination integration hooks.                             | OWASP Session Management Cheat Sheet: server-side session invalidation.  |
-| Reauthentication freshness | Supports `reauth_at` stamping and minimum freshness checks after account-security changes. | OWASP ASVS: reauthentication after sensitive events.                     |
-| Secret strength            | Validates HMAC entropy and asymmetric key type/strength.                                   | OWASP ASVS cryptographic key strength guidance.                          |
-| Safe storage integration   | Provides SHA-256 and peppered HMAC token digest helpers.                                   | OWASP storage guidance: avoid storing raw credentials or bearer secrets. |
+## Threats and Controls
 
-## Integration With OwlSessionGuard
+| Threat                                | Library Control                                             | Integrator Responsibility                                |
+| ------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------- |
+| Token tampering                       | Signature-first verification and strict parsing             | Never consume unverified token payloads                  |
+| Algorithm downgrade                   | Verification allowlist and explicit `none` rejection        | Configure only required algorithms                       |
+| Key confusion                         | Symmetric and asymmetric key-path separation                | Keep key classes isolated in config and storage          |
+| Weak key material                     | Runtime validation of HS/RS/ES key requirements             | Rotate secrets/keys and store in secure secret manager   |
+| Wrong token usage                     | Purpose enforcement (`access`, `id`, `refresh`)             | Apply route-level purpose policy consistently            |
+| Refresh replay                        | Rotation hooks with one-time consumption integration points | Persist rotation state atomically in session store       |
+| Session continuation after risk event | Revocation and cutoff integration hooks                     | Implement revoke-all, cutoff, and breach response policy |
+| Sensitive payload disclosure          | Optional AES-256-GCM payload cipher support                 | Protect encryption keys and avoid token overexposure     |
+| Error probing                         | Generic middleware auth failure mode                        | Keep detailed diagnostics in private logs only           |
 
-Use OwlTokenGuard for token cryptography and verification. Use OwlSessionGuard
-for durable session lifecycle state:
+## OWASP Alignment
 
-- Active session records.
+The model is aligned to OWASP JWT and session-management guidance through these
+enforced behaviors:
+
+- Signature validation before claim trust.
+- Strict algorithm allowlisting and `none` rejection.
+- Temporal checks (`exp`, `nbf`, `iat`) and size limits.
+- Issuer and audience validation support.
+- Token-purpose separation.
+- Revocation and refresh-rotation integration hooks.
+
+Alignment indicates design intent and implemented controls. It is not a formal
+certification.
+
+## Integration Boundary With OwlSessionGuard
+
+OwlTokenGuard owns token-level cryptography and verification.
+
+OwlSessionGuard (or an application-owned equivalent) should own:
+
+- Session record persistence.
 - Refresh-token rotation state.
-- Replay detection and breach response.
-- Logout-all-devices and administrative termination.
-- Idle timeout and absolute session lifetime.
-- Device or client binding.
+- Replay detection response.
+- Idle and absolute session lifetime.
+- Administrative revoke-all and device/session policy.
 
-When storing refresh-token records, store a digest created by
-`createTokenDigest()` instead of the raw token. Prefer the peppered HMAC form
-when the digest is persisted in a database.
+Recommended pattern: store token digests instead of raw token values in durable
+stores.
 
-## Operational Requirements
+## Operational Assumptions
 
-- Run on a supported Node.js version tested by CI: 18, 20, or 22.
-- Use HTTPS in production.
-- Keep private keys, HMAC secrets, and digest peppers in a secret manager.
-- Rotate keys and secrets according to your organizational policy.
-- Use short access-token lifetimes and persist refresh-token state server-side.
-- Treat middleware `req.auth` and `request.auth` as authenticated identity data,
-  not as authorization by itself.
+- Production traffic uses HTTPS.
+- Secrets and signing keys are stored outside source control.
+- Key rotation and incident response processes exist.
+- Access token lifetime is short relative to refresh lifetime.
+- Hook implementations are treated as security-critical code.
 
 ## Known Limits
 
-- DPoP sender-constrained tokens are roadmap work.
-- `auth_time`, `acr`, and `amr` helper checks are roadmap work.
-- Custom JWT implementation remains security-sensitive. Maintainers should
-  periodically compare behavior against maintained JOSE libraries and consider
-  independent review before major security claims.
+- Sender-constrained token features (for example DPoP) are not implemented.
+- Advanced authentication-context claim helpers (`auth_time`, `acr`, `amr`)
+  are not yet first-class verification primitives.
+- Security posture depends on integration quality for session storage and
+  revocation workflows.
