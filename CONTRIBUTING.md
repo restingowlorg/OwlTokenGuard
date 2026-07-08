@@ -74,4 +74,4 @@ Examples:
 
 - `fix(core): prevent refresh token access use`
 - `feat(security): add token digest helper`
-- `docs(release): add security model`
+- `docs(security): clarify reporting and security boundaries`

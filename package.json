@@ -1,6 +1,6 @@
 {
   "name": "@restingowlorg/owltokenguard",
-  "version": "0.0.0",
+  "version": "1.0.0-next.0",
   "description": "OwlTokenGuard: OWASP-aligned token issuance, refresh rotation, verification, and revocation-aware token checks for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
