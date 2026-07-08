@@ -146,8 +146,7 @@ SKIP_HOOKS=true git push
 - `staging`: validation branch. Publishes prerelease builds to the npm `next` tag.
 - `main`: stable release branch. Publishes to npm `latest` via the release workflow.
 
-For the full release flow, see `docs/RELEASE_DAY_RUNBOOK.md` and
-`docs/DETAILED_RELEASE_SYNC_RUNBOOK.md`.
+For the full release flow, see `docs/RELEASE_DAY_RUNBOOK.md`.
 
 ## Team Rules
 
